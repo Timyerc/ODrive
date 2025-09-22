@@ -54,6 +54,30 @@ void CANSimple::handle_can_message(const can_Message_t& msg) {
         }
     }
 }
+//#define USE_CUSTOM_CAN
+
+
+#ifdef USE_CUSTOM_CAN
+void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
+    const uint32_t cmd = get_cmd_id(msg.id);
+    axis.watchdog_feed();
+    switch (cmd) {
+        case MSG_CO_NMT_CTRL:
+            break;
+        case MSG_CO_HEARTBEAT_CMD:
+            break;
+        case MSG_ODRIVE_HEARTBEAT:
+            // We don't currently do anything to respond to ODrive heartbeat messages
+            break;
+
+
+
+        default:
+            break;
+    }
+}
+#else
+
 
 void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
     const uint32_t cmd = get_cmd_id(msg.id);
@@ -162,6 +186,7 @@ void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
             break;
     }
 }
+#endif
 
 void CANSimple::nmt_callback(const Axis& axis, const can_Message_t& msg) {
     // Not implemented
