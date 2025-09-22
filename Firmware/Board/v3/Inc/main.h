@@ -56,21 +56,21 @@
 /* USER CODE BEGIN Includes */
 #include "stm32f4xx_hal.h"
 
-#if HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 1 \
-||  HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 2
-#include "prev_board_ver/main_V3_2.h"
-#elif HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 3 \
-||  HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 4
-#include "prev_board_ver/main_V3_4.h"
-#else
-/* USER CODE END Includes */
+// #if HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 1 \
+// ||  HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 2
+// #include "prev_board_ver/main_V3_2.h"
+// #elif HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 3 \
+// ||  HW_VERSION_MAJOR == 3 && HW_VERSION_MINOR == 4
+// #include "prev_board_ver/main_V3_4.h"
+// #else
+// /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/
 #define TIM_1_8_CLOCK_HZ 168000000
-#define TIM_1_8_PERIOD_CLOCKS 3500
+#define TIM_1_8_PERIOD_CLOCKS (3500 * 2)
 #define TIM_1_8_DEADTIME_CLOCKS 20
 #define TIM_APB1_CLOCK_HZ 84000000
-#define TIM_APB1_PERIOD_CLOCKS 4096
+#define TIM_APB1_PERIOD_CLOCKS (4096 * 2)
 #define TIM_APB1_DEADTIME_CLOCKS 40
 #define TIM_1_8_RCR 2
 
@@ -155,16 +155,16 @@
 #define M1_ENC_B_Pin GPIO_PIN_7
 #define M1_ENC_B_GPIO_Port GPIOB
 
-/* ########################## Assert Selection ############################## */
-/**
-  * @brief Uncomment the line below to expanse the "assert_param" macro in the 
-  *        HAL drivers code
-  */
-/* #define USE_FULL_ASSERT    1U */
+// /* ########################## Assert Selection ############################## */
+// /**
+//   * @brief Uncomment the line below to expanse the "assert_param" macro in the 
+//   *        HAL drivers code
+//   */
+// /* #define USE_FULL_ASSERT    1U */
 
-/* USER CODE BEGIN Private defines */
-#endif
-/* USER CODE END Private defines */
+// /* USER CODE BEGIN Private defines */
+// #endif
+// /* USER CODE END Private defines */
 
 #ifdef __cplusplus
  extern "C" {

@@ -23,12 +23,13 @@ bool CANSimple::renew_subscription(size_t i) {
 
     MsgIdFilterSpecs filter = {
         .id = {},
-        .mask = (uint32_t)(0xffffffff << NUM_CMD_ID_BITS)};
-    if (axis.config_.can.is_extended) {
-        filter.id = (uint32_t)(axis.config_.can.node_id << NUM_CMD_ID_BITS);
-    } else {
-        filter.id = (uint16_t)(axis.config_.can.node_id << NUM_CMD_ID_BITS);
-    }
+        .mask = (uint32_t)(0xffffffff & 0xff)};
+        filter.id = (uint32_t)0x01;
+    // if (axis.config_.can.is_extended) {
+    //     filter.id = (uint32_t)(axis.config_.can.node_id << NUM_CMD_ID_BITS);
+    // } else {
+    //     filter.id = (uint16_t)(axis.config_.can.node_id << NUM_CMD_ID_BITS);
+    // }
 
     if (subscription_handles_[i]) {
         canbus_->unsubscribe(subscription_handles_[i]);
@@ -41,152 +42,287 @@ bool CANSimple::renew_subscription(size_t i) {
         this, &subscription_handles_[i]);
 }
 
+uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index){
+    uint8_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true);
+    return data;
+}
+
+uint16_t CANSimple::readDate16(const can_Message_t& msg, uint8_t index){
+    uint16_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true) << 8;
+    data += can_getSignal<uint8_t>(msg, index + 8, 8, true);
+    return data;
+}
+
+uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index){
+    uint32_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true) << 24;
+    data += can_getSignal<uint8_t>(msg, index + 8, 8, true) << 16;
+    data += can_getSignal<uint8_t>(msg, index + 16, 8, true) << 8;
+    data += can_getSignal<uint8_t>(msg, index + 24, 8, true);
+    return data;
+}
+
 void CANSimple::handle_can_message(const can_Message_t& msg) {
-    //     Frame
-    // nodeID | CMD
-    // 6 bits | 5 bits
-    uint32_t nodeID = get_node_id(msg.id);
-
-    for (auto& axis : axes) {
-        if ((axis.config_.can.node_id == nodeID) && (axis.config_.can.is_extended == msg.isExt)) {
-            do_command(axis, msg);
-            return;
-        }
-    }
+    do_command(msg);
 }
-//#define USE_CUSTOM_CAN
 
-
-#ifdef USE_CUSTOM_CAN
-void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
-    const uint32_t cmd = get_cmd_id(msg.id);
-    axis.watchdog_feed();
-    switch (cmd) {
-        case MSG_CO_NMT_CTRL:
+void CANSimple::do_command( const can_Message_t& msg) {
+    canMessage_t command;
+    command.cmd  = readDate16(msg, 0);
+    axes[0].watchdog_feed();
+    switch(command.cmd){
+        case DRIVE_COMMAND0_SPEED:
+            command.leftSpeed = readDate16(msg, 8);
+            if(command.leftSpeed > 32768){
+                axes[0].controller_.input_vel_ = 5;
+            }else if(command.leftSpeed < 32768){
+                axes[0].controller_.input_vel_ = -5;
+            }else{
+                axes[0].controller_.input_vel_ = 0;
+            }   
+            break; 
+        case DRIVE_COMMAND0_MODE:
+            // 设置电机模式   暂时不允许更改  默认速度模式
             break;
-        case MSG_CO_HEARTBEAT_CMD:
+        case DRIVE_COMMAND0_START_STOP:
+            // 驱动器启动与停止    （通过修改两个电机的状态实现）
+            // const uint8_t state = can_getSignal<uint8_t>(msg, 8, 8, true);
+            // if(state == 1){
+            //     // 启动 将两个电机设置为闭环模式
+            // }else if(state == 2){
+            //     // 停止 将两个电机设置为空闲模式
+            // }
             break;
-        case MSG_ODRIVE_HEARTBEAT:
-            // We don't currently do anything to respond to ODrive heartbeat messages
+        case DRIVE_COMMAND0_INQUIRY:
+            // 轮子在线问询     返回电机的错误码
+            // const uint8_t motorId = can_getSignal<uint8_t>(msg, 8, 8, true);
+            // if(motorId == 1){
+            //     sendLeftMotorError(axis);
+            // }else if(motorId == 2){
+            //     sendRightMotorError(axis);
+            // }
             break;
-
-
-
-        default:
+        case DRIVE_COMMAND0_GET_SPEED:
+            // 电机转速反馈    内容以及一些信息还未填入api
+            // const uint8_t motorId = can_getSignal<uint8_t>(msg, 8, 8, true);
+            // if(motorId == 1){
+            //     sendLeftMotorSpeed(axis);
+            // }else if(motorId == 2){
+            //     sendRightMotorSpeed(axis);
+            // }
             break;
-    }
-}
-#else
-
-
-void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
-    const uint32_t cmd = get_cmd_id(msg.id);
-    axis.watchdog_feed();
-    switch (cmd) {
-        case MSG_CO_NMT_CTRL:
+        case DRIVE_COMMAND0_PHASE_SEQUENCE:
+            // 设置电机相序  暂时不做这个功能    初始配置的时候会绑定相序
             break;
-        case MSG_CO_HEARTBEAT_CMD:
-            break;
-        case MSG_ODRIVE_HEARTBEAT:
-            // We don't currently do anything to respond to ODrive heartbeat messages
-            break;
-        case MSG_ODRIVE_ESTOP:
-            estop_callback(axis, msg);
-            break;
-        case MSG_GET_MOTOR_ERROR:
-            if (msg.rtr || msg.len == 0)
-                get_motor_error_callback(axis);
-            break;
-        case MSG_GET_ENCODER_ERROR:
-            if (msg.rtr || msg.len == 0)
-                get_encoder_error_callback(axis);
-            break;
-        case MSG_GET_SENSORLESS_ERROR:
-            if (msg.rtr || msg.len == 0)
-                get_sensorless_error_callback(axis);
-            break;
-        case MSG_SET_AXIS_NODE_ID:
-            set_axis_nodeid_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_REQUESTED_STATE:
-            set_axis_requested_state_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_STARTUP_CONFIG:
-            set_axis_startup_config_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_ESTIMATES:
-            if (msg.rtr || msg.len == 0)
-                get_encoder_estimates_callback(axis);
-            break;
-        case MSG_GET_ENCODER_COUNT:
-            if (msg.rtr || msg.len == 0)
-                get_encoder_count_callback(axis);
-            break;
-        case MSG_SET_INPUT_POS:
-            set_input_pos_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_VEL:
-            set_input_vel_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_TORQUE:
-            set_input_torque_callback(axis, msg);
-            break;
-        case MSG_SET_CONTROLLER_MODES:
-            set_controller_modes_callback(axis, msg);
-            break;
-        case MSG_SET_LIMITS:
-            set_limits_callback(axis, msg);
-            break;
-        case MSG_START_ANTICOGGING:
-            start_anticogging_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_INERTIA:
-            set_traj_inertia_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_ACCEL_LIMITS:
-            set_traj_accel_limits_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_VEL_LIMIT:
-            set_traj_vel_limit_callback(axis, msg);
-            break;
-        case MSG_GET_IQ:
-            if (msg.rtr || msg.len == 0)
-                get_iq_callback(axis);
-            break;
-        case MSG_GET_SENSORLESS_ESTIMATES:
-            if (msg.rtr || msg.len == 0)
-                get_sensorless_estimates_callback(axis);
-            break;
-        case MSG_RESET_ODRIVE:
-            NVIC_SystemReset();
-            break;
-        case MSG_GET_BUS_VOLTAGE_CURRENT:
-            if (msg.rtr || msg.len == 0)
-                get_bus_voltage_current_callback(axis);
-            break;
-        case MSG_CLEAR_ERRORS:
-            clear_errors_callback(axis, msg);
-            break;
-        case MSG_SET_LINEAR_COUNT:
-            set_linear_count_callback(axis, msg);
-            break;
-        case MSG_SET_POS_GAIN:
-            set_pos_gain_callback(axis, msg);
-            break;
-        case MSG_SET_VEL_GAINS:
-            set_vel_gains_callback(axis, msg);
-            break;
-        case MSG_GET_ADC_VOLTAGE:
-            get_adc_voltage_callback(axis, msg);
-            break;
-        case MSG_GET_CONTROLLER_ERROR:
-            get_controller_error_callback(axis);
+        case DRIVE_COMMAND0_MOTOR_REVERSE:
+            // 设置电机转向
+            // const uint8_t motorId = can_getSignal<uint8_t>(msg, 8, 8, true);
+            // const uint8_t motorDir = can_getSignal<uint8_t>(msg, 16, 8, true);
+            // if(motorId == 1){
+            //     // 左电机
+            // }else if(motorId == 2){
+            //     // 右电机
+            // }
             break;
         default:
-            break;
+
+            break;    
     }
 }
-#endif
+
+/*
+故障类型：
+    0X01：正常，0X02：电机过温，0X03：电机过流，0X04:制动器异常，0X05：霍尔故障，
+    0X06：MOS管故障，0X07：电机缺项，0X08：电机堵转，0X30：相电流偏置值异常，0X31：母线电流偏置值异常；
+    0x32:电机未连接，0X33:电机过温，0x34:硬件过流，0x35:制动器过流
+*/
+bool CANSimple::sendLeftMotorError(const Axis& axis) {
+    can_Message_t txmsg;
+#ifdef USE_CAN_MOTOR  
+    txmsg.id = LEFT_DRIVE_CAN_ID;
+#elif USE_CAN_BRUSH
+    txmsg.id = LEFT_BRUSH_CAN_ID;
+#endif    
+    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.len = 8;
+
+    // uint8_t error = 0x01; 
+
+    // can_setSignal(error, 0, 8, true); // error
+    // can_setSignal(, 8, 16, true);  // hall change
+    // can_setSignal(, 24, 16, true); // speed
+    // can_setSignal(, 40, 8, true);  // frames
+    // can_setSignal(, 48, 16, true); // current
+
+    return canbus_->send_message(txmsg);
+}
+
+bool CANSimple::sendRightMotorError(const Axis& axis) {
+    can_Message_t txmsg;
+#ifdef USE_CAN_MOTOR  
+    txmsg.id = RIGHT_DRIVE_CAN_ID;
+#elif USE_CAN_BRUSH
+    txmsg.id = RIGHT_BRUSH_CAN_ID;
+#endif    
+    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.len = 8;
+
+    // uint8_t error = 0x01; 
+
+    // can_setSignal(error, 0, 8, true); // error
+    // can_setSignal(, 8, 16, true);  // hall change
+    // can_setSignal(, 24, 16, true); // speed
+    // can_setSignal(, 40, 8, true);  // frames
+    // can_setSignal(, 48, 16, true); // current
+
+    return canbus_->send_message(txmsg);
+}
+
+bool CANSimple::sendLeftMotorSpeed(const Axis& axis) {
+    can_Message_t txmsg;
+#ifdef USE_CAN_MOTOR  
+    txmsg.id = LEFT_DRIVE_CAN_ID;
+#elif USE_CAN_BRUSH
+    txmsg.id = LEFT_BRUSH_CAN_ID;
+#endif    
+    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.len = 8;
+
+    // can_setSignal(MOTOR_HALL_CHANGE_AND_SPEED, 0, 8, true); // cmd 0x09
+    // can_setSignal(, 8, 16, true);  // hall change
+    // can_setSignal(, 24, 16, true); // speed
+    // can_setSignal(, 40, 8, true);  // frames
+    // can_setSignal(, 48, 16, true); // current
+    return canbus_->send_message(txmsg);
+}
+
+bool CANSimple::sendRightMotorSpeed(const Axis& axis) {
+    can_Message_t txmsg;
+#ifdef USE_CAN_MOTOR  
+    txmsg.id = RIGHT_DRIVE_CAN_ID;
+#elif USE_CAN_BRUSH
+    txmsg.id = RIGHT_BRUSH_CAN_ID;
+#endif    
+    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.len = 8;
+
+    // can_setSignal(MOTOR_HALL_CHANGE_AND_SPEED, 0, 8, true); // cmd 0x09
+    // can_setSignal(, 8, 16, true);  // hall change
+    // can_setSignal(, 24, 16, true); // speed
+    // can_setSignal(, 40, 8, true);  // frames
+    // can_setSignal(, 48, 16, true); // current
+    return canbus_->send_message(txmsg);
+}
+
+// void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
+//     const uint32_t cmd = get_cmd_id(msg.id);
+//     axis.watchdog_feed();
+//     switch (cmd) {
+//         case MSG_CO_NMT_CTRL:
+//             break;
+//         case MSG_CO_HEARTBEAT_CMD:
+//             break;
+//         case MSG_ODRIVE_HEARTBEAT:
+//             // We don't currently do anything to respond to ODrive heartbeat messages
+//             break;
+//         case MSG_ODRIVE_ESTOP:
+//             estop_callback(axis, msg);
+//             break;
+//         case MSG_GET_MOTOR_ERROR:
+//             if (msg.rtr || msg.len == 0)
+//                 get_motor_error_callback(axis);
+//             break;
+//         case MSG_GET_ENCODER_ERROR:
+//             if (msg.rtr || msg.len == 0)
+//                 get_encoder_error_callback(axis);
+//             break;
+//         case MSG_GET_SENSORLESS_ERROR:
+//             if (msg.rtr || msg.len == 0)
+//                 get_sensorless_error_callback(axis);
+//             break;
+//         case MSG_SET_AXIS_NODE_ID:
+//             set_axis_nodeid_callback(axis, msg);
+//             break;
+//         case MSG_SET_AXIS_REQUESTED_STATE:
+//             set_axis_requested_state_callback(axis, msg);
+//             break;
+//         case MSG_SET_AXIS_STARTUP_CONFIG:
+//             set_axis_startup_config_callback(axis, msg);
+//             break;
+//         case MSG_GET_ENCODER_ESTIMATES:
+//             if (msg.rtr || msg.len == 0)
+//                 get_encoder_estimates_callback(axis);
+//             break;
+//         case MSG_GET_ENCODER_COUNT:
+//             if (msg.rtr || msg.len == 0)
+//                 get_encoder_count_callback(axis);
+//             break;
+//         case MSG_SET_INPUT_POS:
+//             set_input_pos_callback(axis, msg);
+//             break;
+//         case MSG_SET_INPUT_VEL:
+//             set_input_vel_callback(axis, msg);
+//             break;
+//         case MSG_SET_INPUT_TORQUE:
+//             set_input_torque_callback(axis, msg);
+//             break;
+//         case MSG_SET_CONTROLLER_MODES:
+//             set_controller_modes_callback(axis, msg);
+//             break;
+//         case MSG_SET_LIMITS:
+//             set_limits_callback(axis, msg);
+//             break;
+//         case MSG_START_ANTICOGGING:
+//             start_anticogging_callback(axis, msg);
+//             break;
+//         case MSG_SET_TRAJ_INERTIA:
+//             set_traj_inertia_callback(axis, msg);
+//             break;
+//         case MSG_SET_TRAJ_ACCEL_LIMITS:
+//             set_traj_accel_limits_callback(axis, msg);
+//             break;
+//         case MSG_SET_TRAJ_VEL_LIMIT:
+//             set_traj_vel_limit_callback(axis, msg);
+//             break;
+//         case MSG_GET_IQ:
+//             if (msg.rtr || msg.len == 0)
+//                 get_iq_callback(axis);
+//             break;
+//         case MSG_GET_SENSORLESS_ESTIMATES:
+//             if (msg.rtr || msg.len == 0)
+//                 get_sensorless_estimates_callback(axis);
+//             break;
+//         case MSG_RESET_ODRIVE:
+//             NVIC_SystemReset();
+//             break;
+//         case MSG_GET_BUS_VOLTAGE_CURRENT:
+//             if (msg.rtr || msg.len == 0)
+//                 get_bus_voltage_current_callback(axis);
+//             break;
+//         case MSG_CLEAR_ERRORS:
+//             clear_errors_callback(axis, msg);
+//             break;
+//         case MSG_SET_LINEAR_COUNT:
+//             set_linear_count_callback(axis, msg);
+//             break;
+//         case MSG_SET_POS_GAIN:
+//             set_pos_gain_callback(axis, msg);
+//             break;
+//         case MSG_SET_VEL_GAINS:
+//             set_vel_gains_callback(axis, msg);
+//             break;
+//         case MSG_GET_ADC_VOLTAGE:
+//             get_adc_voltage_callback(axis, msg);
+//             break;
+//         case MSG_GET_CONTROLLER_ERROR:
+//             get_controller_error_callback(axis);
+//             break;
+//         default:
+//             break;
+//     }
+// }
 
 void CANSimple::nmt_callback(const Axis& axis, const can_Message_t& msg) {
     // Not implemented

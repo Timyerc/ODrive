@@ -52,8 +52,18 @@ class CANSimple {
 
     void handle_can_message(const can_Message_t& msg);
 
-    void do_command(Axis& axis, const can_Message_t& cmd);
+    void do_command(const can_Message_t& cmd);
     
+    // ovo-new
+    uint8_t readDate8(const can_Message_t& msg, uint8_t index);
+    uint16_t readDate16(const can_Message_t& msg, uint8_t index);
+    uint32_t readDate32(const can_Message_t& msg, uint8_t index);
+    bool sendLeftMotorSpeed(const Axis& axis);
+    bool sendRightMotorSpeed(const Axis& axis);
+    bool sendLeftMotorError(const Axis& axis);
+    bool sendRightMotorError(const Axis& axis);
+    // 
+
     // Get functions (msg.rtr bit must be set)
     bool get_motor_error_callback(const Axis& axis);
     bool get_encoder_error_callback(const Axis& axis);
@@ -92,14 +102,23 @@ class CANSimple {
     static constexpr uint8_t NUM_NODE_ID_BITS = 6;
     static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
-    // Utility functions
     static constexpr uint32_t get_node_id(uint32_t msgID) {
-        return (msgID >> NUM_CMD_ID_BITS);  // Upper 6 or more bits
+        return msgID;
     };
 
-    static constexpr uint8_t get_cmd_id(uint32_t msgID) {
-        return (msgID & 0x01F);  // Bottom 5 bits
+    static constexpr uint8_t get_cmd_id(uint8_t cmd) {
+        return cmd;  
     }
+
+
+    // Utility functions
+    // static constexpr uint32_t get_node_id(uint32_t msgID) {
+    //     return (msgID >> NUM_CMD_ID_BITS);  // Upper 6 or more bits
+    // };
+
+    // static constexpr uint8_t get_cmd_id(uint32_t msgID) {
+    //     return (msgID & 0x01F);  // Bottom 5 bits
+    // }
 
     CanBusBase* canbus_;
     CanBusBase::CanSubscription* subscription_handles_[AXIS_COUNT];
@@ -109,5 +128,11 @@ class CANSimple {
     uint32_t node_ids_[AXIS_COUNT];
     bool extended_node_ids_[AXIS_COUNT];
 };
+
+typedef struct canMessage_s{
+    uint8_t cmd;
+    uint16_t leftSpeed;
+    uint16_t rightSpeed;
+} canMessage_t;
 
 #endif

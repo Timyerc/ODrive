@@ -13,6 +13,7 @@
 
 bool ODriveCAN::apply_config() {
     config_.parent = this;
+    config_.baud_rate = CAN_BAUD_100K;
     set_baud_rate(config_.baud_rate);
     return true;
 }
@@ -166,9 +167,7 @@ bool ODriveCAN::subscribe(const MsgIdFilterSpecs& filter, on_can_message_cb_t ca
     }
 
     bool is_extended = filter.id.index() == 1;
-    uint32_t id = is_extended ?
-                  ((std::get<1>(filter.id) << 3) | (1 << 2)) :
-                  (std::get<0>(filter.id) << 21);
+    uint32_t id = 0x01;
     uint32_t mask = (is_extended ? (filter.mask << 3) : (filter.mask << 21))
                   | (1 << 2); // care about the is_extended bit
 
@@ -176,10 +175,10 @@ bool ODriveCAN::subscribe(const MsgIdFilterSpecs& filter, on_can_message_cb_t ca
     hal_filter.FilterActivation = ENABLE;
     hal_filter.FilterBank = &*it - &subscriptions_[0];
     hal_filter.FilterFIFOAssignment = it->fifo;
-    hal_filter.FilterIdHigh = (id >> 16) & 0xffff;
+    hal_filter.FilterIdHigh = 0;
     hal_filter.FilterIdLow = id & 0xffff;
-    hal_filter.FilterMaskIdHigh = (mask >> 16) & 0xffff;
-    hal_filter.FilterMaskIdLow = mask & 0xffff;
+    // hal_filter.FilterMaskIdHigh = (mask >> 16) & 0xffff;
+    // hal_filter.FilterMaskIdLow = mask & 0xffff;
     hal_filter.FilterMode = CAN_FILTERMODE_IDMASK;
     hal_filter.FilterScale = CAN_FILTERSCALE_32BIT;
 

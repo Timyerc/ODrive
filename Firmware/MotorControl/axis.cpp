@@ -78,6 +78,12 @@ bool Axis::apply_config() {
     config_.parent = this;
     decode_step_dir_pins();
     watchdog_feed();
+    // 定义设备id
+#ifdef USE_CAN_MOTOR
+    config_.can.node_id = CON_CAN_ID_TO_DRIVE;
+#elif USE_CAN_BRUSH
+    config_.can.node_id = CON_CAN_ID_TO_BRUSH;
+#endif
     return true;
 }
 

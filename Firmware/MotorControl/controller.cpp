@@ -190,7 +190,8 @@ bool Controller::update() {
             torque_setpoint_ = input_torque_; 
         } break;
         case INPUT_MODE_VEL_RAMP: {
-            float max_step_size = std::abs(current_meas_period * config_.vel_ramp_rate);
+            //这个是慢慢累加上去的速度input_vel_是我们设置的转速让他最终以这个转速运行
+            float max_step_size = std::abs(current_meas_period * config_.vel_ramp_rate); // 0.00025 *  vel_ramp_rate = 0.0025
             float full_step = input_vel_ - vel_setpoint_;
             float step = std::clamp(full_step, -max_step_size, max_step_size);
 
