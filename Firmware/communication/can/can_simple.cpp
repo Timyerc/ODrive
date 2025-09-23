@@ -66,6 +66,7 @@ uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index){
 
 void CANSimple::handle_can_message(const can_Message_t& msg) {
     do_command(msg);
+    canbus_->send_message(msg);//原样返回接收到的数据帧
 }
 
 void CANSimple::do_command( const can_Message_t& msg) {
@@ -73,7 +74,7 @@ void CANSimple::do_command( const can_Message_t& msg) {
     command.cmd  = readDate16(msg, 0);
     axes[0].watchdog_feed();
     switch(command.cmd){
-        case DRIVE_COMMAND0_SPEED:
+        case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
             command.leftSpeed = readDate16(msg, 8);
             if(command.leftSpeed > 32768){
                 axes[0].controller_.input_vel_ = 5;
@@ -197,7 +198,7 @@ bool CANSimple::sendLeftMotorSpeed(const Axis& axis) {
     // can_setSignal(, 48, 16, true); // current
     return canbus_->send_message(txmsg);
 }
-
+//获取左电机转速
 bool CANSimple::sendRightMotorSpeed(const Axis& axis) {
     can_Message_t txmsg;
 #ifdef USE_CAN_MOTOR  
