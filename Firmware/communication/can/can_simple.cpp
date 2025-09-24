@@ -3,7 +3,7 @@
 
 #include <odrive_main.h>
 #include <functional>
-
+#include "axis.hpp"
 bool CANSimple::init() {
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         if (!renew_subscription(i)) {
@@ -166,23 +166,26 @@ bool CANSimple::get_adc_voltage_callback(const Axis& axis, const can_Message_t& 
         return false;
     }
 }
+void CANSimple::handle_can_message(const can_Message_t& msg) {
+    //     Frame
+    // nodeID | CMD
+    // 6 bits | 5 bits
+    uint32_t nodeID = get_node_id(msg.id);
+
+    for (auto& axis : axes) {
+        if ((axis.config_.can.node_id == nodeID) && (axis.config_.can.is_extended == msg.isExt)) {
+            do_command(axis, msg);
+            return;
+        }
+    }
+}
+
 #endif
-// //返回调试参数
-// void  returnUserPara(const can_Message_t& msg)
-// {
-//     can_Message_t txmsg;
-//     auto voltage = 1;
-//     txmsg.id = axis.config_.can.node_id << NUM_CMD_ID_BITS;
-//     txmsg.id += MSG_GET_ADC_VOLTAGE;
-//     txmsg.isExt = axis.config_.can.is_extended;
-//     txmsg.len = 8;
-//     can_setSignal<float>(txmsg, voltage, 0, 32, true);
-//     return canbus_->send_message(txmsg);
-// }
+
 //Odrive接收到的CAN命令都将在此处解析处理
 void CANSimple::handle_can_message(const can_Message_t& msg) {
     do_command(msg);
-    canbus_->send_message(msg);//原样返回接收到的数据帧，验证收发正常
+    //canbus_->send_message(msg);//原样返回接收到的数据帧，验证收发正常
 }
 //按照流程Odrive开机时需要进行自检
 //然后进入闭环控制模式
@@ -194,8 +197,11 @@ void CANSimple::handle_can_message(const can_Message_t& msg) {
 #ifdef USE_USER_CAN
 void CANSimple::do_command( const can_Message_t& msg) {
     canMessage_t command;
+    uint8_t state = 0;
+   // uint32_t nodeID = get_node_id(msg.id);//0001,0010,CAN_ID验证（滚刷电机X2）、(行走电机X2)
     command.cmd  = readDate8(msg, 0);
     axes[0].watchdog_feed();
+
     switch(command.cmd){
         case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
             //Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
@@ -204,19 +210,49 @@ void CANSimple::do_command( const can_Message_t& msg) {
 
             command.rightSpeed = readDate16(msg, 24);
             axes[1].controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
-            //returnUserPara(msg);
             break; 
-        case DRIVE_COMMAND0_MODE:
-            // 设置电机模式   暂时不允许更改  默认速度模式
+
+        case DRIVE_MOTOR_CALIBRATION://电机自检
+            //axes[0].requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+            axes[1].requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+        break;
+
+        case DRIVE_ENCODER_OFFSET_CALIBRATION://编码器校准
+            state = readDate8(msg, 8);
+            if(state == 1){//电机1编码器校准
+                axes[0].requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            }else if(state == 2){//电机2编码器校准
+                axes[1].requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            }
             break;
-        case DRIVE_COMMAND0_START_STOP:
-            // 驱动器启动与停止    （通过修改两个电机的状态实现）
-            // const uint8_t state = can_getSignal<uint8_t>(msg, 8, 8, true);
-            // if(state == 1){
-            //     // 启动 将两个电机设置为闭环模式
-            // }else if(state == 2){
-            //     // 停止 将两个电机设置为空闲模式
-            // }
+
+        case DRIVE_COMMAND0_START_STOP://0x04驱动器启动与停止（通过修改两个电机的状态实现）
+            state = readDate8(msg, 8);//can_getSignal<uint8_t>(msg, 8, 8, true);
+            if(state == 1){// 启动 将两个电机设置为闭环模式
+                //axes[0].requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;//requested_state_归属于enum AxisState
+                axes[1].requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            }else if(state == 2){// 停止 将两个电机设置为空闲模式
+                //axes[0].requested_state_ = Axis::AXIS_STATE_IDLE;
+                axes[1].requested_state_ = Axis::AXIS_STATE_IDLE;
+            }
+            break;
+
+        case DRIVE_COMMAND0_GET_SPEED://速度查询
+            state = readDate8(msg, 8);
+            if(state == 1){//电机0
+                get_encoder_estimates_callback(axes[0]);//返回转子位置以及速度
+            }else if(state == 2){//电机1
+                get_encoder_estimates_callback(axes[1]);
+            }
+            break;
+
+
+
+            
+  
+
+        case DRIVE_COMMAND0_MODE:// 设置电机模式，默认速度模式
+                //set_controller_modes_callback(axis, msg);//设置电机控制模式位置环，电流环，速度环
             break;
         case DRIVE_COMMAND0_INQUIRY:
             // 轮子在线问询     返回电机的错误码
@@ -227,15 +263,7 @@ void CANSimple::do_command( const can_Message_t& msg) {
             //     sendRightMotorError(axis);
             // }
             break;
-        case DRIVE_COMMAND0_GET_SPEED:
-            // 电机转速反馈    内容以及一些信息还未填入api
-            // const uint8_t motorId = can_getSignal<uint8_t>(msg, 8, 8, true);
-            // if(motorId == 1){
-            //     sendLeftMotorSpeed(axis);
-            // }else if(motorId == 2){
-            //     sendRightMotorSpeed(axis);
-            // }
-            break;
+
         case DRIVE_COMMAND0_PHASE_SEQUENCE:
             // 设置电机相序  暂时不做这个功能    初始配置的时候会绑定相序
             break;
@@ -284,7 +312,7 @@ void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
         case MSG_SET_AXIS_NODE_ID:
             set_axis_nodeid_callback(axis, msg);
             break;
-        case MSG_SET_AXIS_REQUESTED_STATE:
+        case MSG_SET_AXIS_REQUESTED_STATE://设置电机
             set_axis_requested_state_callback(axis, msg);
             break;
         case MSG_SET_AXIS_STARTUP_CONFIG:
@@ -301,7 +329,7 @@ void CANSimple::do_command(Axis& axis, const can_Message_t& msg) {
         case MSG_SET_INPUT_POS:
             set_input_pos_callback(axis, msg);
             break;
-        case MSG_SET_INPUT_VEL:
+        case MSG_SET_INPUT_VEL://设置电机速度
             set_input_vel_callback(axis, msg);
             break;
         case MSG_SET_INPUT_TORQUE:
@@ -431,18 +459,55 @@ void CANSimple::set_axis_requested_state_callback(Axis& axis, const can_Message_
 void CANSimple::set_axis_startup_config_callback(Axis& axis, const can_Message_t& msg) {
     // Not Implemented
 }
-
+//029H返回编码器位置及转速
 bool CANSimple::get_encoder_estimates_callback(const Axis& axis) {
+    #if 1
     can_Message_t txmsg;
-    txmsg.id = axis.config_.can.node_id << NUM_CMD_ID_BITS;
-    txmsg.id += MSG_GET_ENCODER_ESTIMATES;  // heartbeat ID
-    txmsg.isExt = axis.config_.can.is_extended;
-    txmsg.len = 8;
+    uint16_t Speed = 0;
+    uint16_t encoder = 0;
 
-    can_setSignal<float>(txmsg, axis.controller_.pos_estimate_linear_src_.any().value_or(0.0f), 0, 32, true);
-    can_setSignal<float>(txmsg, axis.controller_.vel_estimate_src_.any().value_or(0.0f), 32, 32, true);
+    txmsg.id = 03;  // heartbeat ID
+
+    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.len = 5;
+    InputPort<float> pos_estimate_linear_src_;
+    InputPort<float> pos_estimate_circular_src_;
+    InputPort<float> vel_estimate_src_;
+    InputPort<float> pos_wrap_src_; 
+
+    encoder = axis.controller_.pos_estimate_circular_src_.any().value_or(0.0f)*65536.0f;//计算位置
+    Speed = ((axis.controller_.vel_estimate_src_.any().value_or(0.0f))*60 + 32768.0f);
+
+    txmsg.buf[0] = 0x09;//状态码
+    txmsg.buf[1] = encoder >> 8;
+    txmsg.buf[2] = encoder;
+    txmsg.buf[3] = Speed >> 8;
+    txmsg.buf[4] = Speed;
+    // can_setSignal(txmsg, 09, 0, 8, true);
+    // can_setSignal(txmsg, Speed, 8, 16, true);
+    // can_setSignal(txmsg, encoder, 24, 16, true);
 
     return canbus_->send_message(txmsg);
+    #else
+        can_Message_t txmsg;
+        txmsg.id = axis.config_.can.node_id << NUM_CMD_ID_BITS;
+        txmsg.id += MSG_GET_ENCODER_ESTIMATES;  // heartbeat ID
+        txmsg.isExt = axis.config_.can.is_extended;
+        txmsg.len = 8;
+        encoder = axis.controller_.pos_estimate_circular_src_.any().value_or(0.0f);//计算位置
+        Speed = ((axis.controller_.vel_estimate_src_.any().value_or(0.0f))*60 + 32768.0f);
+
+        txmsg.buf[0] = 0x09;//状态码
+        txmsg.buf[1] = encoder >> 8;
+        txmsg.buf[2] = encoder;
+        txmsg.buf[3] = Speed >> 8;
+        txmsg.buf[4] = Speed;
+
+        //can_setSignal<float>(txmsg, axis.controller_.pos_estimate_linear_src_.any().value_or(0.0f), 0, 32, true);
+        //can_setSignal<float>(txmsg, axis.controller_.vel_estimate_src_.any().value_or(0.0f), 32, 32, true);
+        //can_setSignal<float>(txmsg, Speed, 32, 16, true);
+        return canbus_->send_message(txmsg);
+    #endif
 }
 
 bool CANSimple::get_sensorless_estimates_callback(const Axis& axis) {
@@ -607,9 +672,9 @@ uint32_t CANSimple::service_stack() {
     };
 
     for (auto& axis : axes) {
-        std::array<periodic, 10> periodics = {{
-            {axis.config_.can.heartbeat_rate_ms, axis.can_.last_heartbeat, &CANSimple::send_heartbeat},
-            {axis.config_.can.encoder_rate_ms, axis.can_.last_encoder, &CANSimple::get_encoder_estimates_callback},
+        std::array<periodic, 8> periodics = {{
+            // {axis.config_.can.heartbeat_rate_ms, axis.can_.last_heartbeat, &CANSimple::send_heartbeat},//心跳包
+            // {axis.config_.can.encoder_rate_ms, axis.can_.last_encoder, &CANSimple::get_encoder_estimates_callback},//编码器位置
             {axis.config_.can.motor_error_rate_ms, axis.can_.last_motor_error, &CANSimple::get_motor_error_callback},
             {axis.config_.can.encoder_error_rate_ms, axis.can_.last_encoder_error, &CANSimple::get_encoder_error_callback},
             {axis.config_.can.controller_error_rate_ms, axis.can_.last_controller_error, &CANSimple::get_controller_error_callback},
@@ -638,7 +703,7 @@ uint32_t CANSimple::service_stack() {
 
     return nextServiceTime;
 }
-
+//自动发送心跳包
 bool CANSimple::send_heartbeat(const Axis& axis) {
     can_Message_t txmsg;
     txmsg.id = axis.config_.can.node_id << NUM_CMD_ID_BITS;

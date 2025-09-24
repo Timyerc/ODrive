@@ -60,6 +60,7 @@ extern "C" {
 #define USE_CAN_MOTOR
 // #define USE_CAN_BRUSH
 // 驱动轮电机相关
+
 #define CON_CAN_ID_TO_DRIVE            0X0001   //驱动轮电机驱动器ID
 #define LEFT_DRIVE_CAN_ID              0x0002   //左驱动电机ID
 #define RIGHT_DRIVE_CAN_ID             0x0003   //右驱动电机ID
@@ -96,6 +97,9 @@ extern "C" {
 #define DRIVE_COMMAND0_GET_SEQUENCE     0XE1    //暂时不做处理
 #define DRIVE_COMMAND0_GET_REVVERSE     0XE2    //暂时不做处理
 #define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
+
+#define DRIVE_MOTOR_CALIBRATION         0xCE    //电机校准
+#define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCF  //编码器校准
 // recve cmd end
 
 /* USER CODE BEGIN Includes */
