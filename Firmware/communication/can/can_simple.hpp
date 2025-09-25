@@ -69,7 +69,7 @@ class CANSimple {
     bool get_encoder_error_callback(const Axis& axis);
     bool get_controller_error_callback(const Axis& axis);
     bool get_sensorless_error_callback(const Axis& axis);
-    bool get_encoder_estimates_callback(const Axis& axis);
+    bool get_encoder_estimates_callback(const Axis& axis,uint32_t id);
     bool get_encoder_count_callback(const Axis& axis);
     bool get_iq_callback(const Axis& axis);
     bool get_sensorless_estimates_callback(const Axis& axis);

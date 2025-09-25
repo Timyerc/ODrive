@@ -98,7 +98,8 @@ extern "C" {
 #define DRIVE_COMMAND0_GET_REVVERSE     0XE2    //暂时不做处理
 #define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
 
-#define DRIVE_MOTOR_CALIBRATION         0xCE    //电机校准
+#define DRIVE_CLEAR_ERRORS                0xCD    //电机错误状态清除
+#define DRIVE_MOTOR_CALIBRATION           0xCE    //电机校准
 #define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCF  //编码器校准
 // recve cmd end
 

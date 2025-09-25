@@ -212,6 +212,11 @@ void CANSimple::do_command( const can_Message_t& msg) {
             axes[1].controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
             break; 
 
+        case DRIVE_CLEAR_ERRORS://异常状态清除
+            clear_errors_callback(axes[0], msg);
+            clear_errors_callback(axes[1], msg);
+        break;
+
         case DRIVE_MOTOR_CALIBRATION://电机自检
             //axes[0].requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
             axes[1].requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
@@ -238,17 +243,13 @@ void CANSimple::do_command( const can_Message_t& msg) {
             break;
 
         case DRIVE_COMMAND0_GET_SPEED://速度查询
-            state = readDate8(msg, 8);
-            if(state == 1){//电机0
-                get_encoder_estimates_callback(axes[0]);//返回转子位置以及速度
-            }else if(state == 2){//电机1
-                get_encoder_estimates_callback(axes[1]);
-            }
+                get_encoder_estimates_callback(axes[0],2);//返回转子位置以及速度
+                get_encoder_estimates_callback(axes[1],3);
             break;
 
 
 
-            
+
   
 
         case DRIVE_COMMAND0_MODE:// 设置电机模式，默认速度模式
@@ -460,15 +461,15 @@ void CANSimple::set_axis_startup_config_callback(Axis& axis, const can_Message_t
     // Not Implemented
 }
 //029H返回编码器位置及转速
-bool CANSimple::get_encoder_estimates_callback(const Axis& axis) {
+bool CANSimple::get_encoder_estimates_callback(const Axis& axis,uint32_t id) {
     #if 1
     can_Message_t txmsg;
     uint16_t Speed = 0;
     uint16_t encoder = 0;
 
-    txmsg.id = 03;  // heartbeat ID
+    txmsg.id = id;  // heartbeat ID
 
-    txmsg.isExt = axis.config_.can.is_extended;
+    txmsg.isExt = true;
     txmsg.len = 5;
     InputPort<float> pos_estimate_linear_src_;
     InputPort<float> pos_estimate_circular_src_;
