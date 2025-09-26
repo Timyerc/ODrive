@@ -29,9 +29,31 @@ uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index){
     data += can_getSignal<uint8_t>(msg, index + 24, 8, true);
     return data;
 }
+//获取电机转速
+bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
+    can_Message_t txmsg;
+    uint16_t Speed = 0;
+    uint16_t encoder = 0;
+
+    txmsg.id = motorNum;  // heartbeat ID
+
+    txmsg.isExt = true;
+    txmsg.len = 5;
+    //encoder = axis->controller_.pos_estimate_circular_src_->any().value_or(0.0f)*65536.0f;//计算位置
+    //Speed = ((axis->controller_.vel_estimate_src_->any().value_or(0.0f))*60 + 32768.0f);
+    encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;
+    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);
+
+    txmsg.buf[0] = 0x09;//状态码
+    txmsg.buf[1] = encoder >> 8;
+    txmsg.buf[2] = encoder;
+    txmsg.buf[3] = Speed >> 8;
+    txmsg.buf[4] = Speed;
+    odCAN->write(txmsg);//返回发送的数据
+    return true;
+}
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
-    odCAN->write(msg);//返回发送的数据
     canMessage_t command;
     command.cmd  = readDate8(msg, 0);
     axes[0]->watchdog_feed();
@@ -46,14 +68,40 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                     command.rightSpeed = readDate16(msg, 24);
                     axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
                 break; 
+
+            case DRIVE_COMMAND0_GET_SPEED://速度查询
+                sendMotorSpeed(axes[0],2);//返回转子位置以及速度
+                sendMotorSpeed(axes[1],3);
+            break;
+
+        case DRIVE_CLEAR_ERRORS://异常状态清除
+            clear_errors_callback(axes[0], msg);
+            clear_errors_callback(axes[1], msg);
+        break;
+        case DRIVE_MOTOR_CALIBRATION://电机自检
+            axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+        break;
+        case DRIVE_ENCODER_OFFSET_CALIBRATION://编码器校准
+                axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+                axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            break;
+
+        case DRIVE_CLOSED_LOOP_CONTROL://进入闭环模式
+                axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+                axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            break;
+        case DRIVE_IDLE_MODE://空闲模式
+                axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
+                axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
+            break;
         default:
             break;
 
     }
 
-
-    //NVIC_SystemReset();//            case DRIVE_COMMAND1_POSITION://轮子位置设置0X02
-
+            
+    //odCAN->write(msg);//返回发送的数据
 }
 #else
 
