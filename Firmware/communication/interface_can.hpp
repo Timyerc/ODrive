@@ -12,6 +12,7 @@
 
 // Anonymous enum for defining the most common CAN baud rates
 enum {
+    CAN_BAUD_100K   = 100000,
     CAN_BAUD_125K   = 125000,
     CAN_BAUD_250K   = 250000,
     CAN_BAUD_500K   = 500000,
@@ -22,7 +23,7 @@ enum {
 class ODriveCAN : public ODriveIntf::CanIntf {
    public:
     struct Config_t {
-        uint32_t baud_rate = CAN_BAUD_250K;
+        uint32_t baud_rate = CAN_BAUD_100K;
         Protocol protocol = PROTOCOL_SIMPLE;
     };
 

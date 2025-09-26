@@ -3,9 +3,60 @@
 #include <odrive_main.h>
 
 #include <cstring>
-
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
+
+#define USE_USER_CAN_CALLBACKS 1
+#if USE_USER_CAN_CALLBACKS
+uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index){
+    uint8_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true);
+    return data;
+}
+
+uint16_t CANSimple::readDate16(const can_Message_t& msg, uint8_t index){
+    uint16_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true) << 8;
+    data += can_getSignal<uint8_t>(msg, index + 8, 8, true);
+    return data;
+}
+
+uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index){
+    uint32_t data = 0;
+    data = can_getSignal<uint8_t>(msg, index, 8, true) << 24;
+    data += can_getSignal<uint8_t>(msg, index + 8, 8, true) << 16;
+    data += can_getSignal<uint8_t>(msg, index + 16, 8, true) << 8;
+    data += can_getSignal<uint8_t>(msg, index + 24, 8, true);
+    return data;
+}
+
+void CANSimple::handle_can_message(can_Message_t& msg) {
+    odCAN->write(msg);//返回发送的数据
+    canMessage_t command;
+    command.cmd  = readDate8(msg, 0);
+    axes[0]->watchdog_feed();
+    axes[1]->watchdog_feed();
+
+    switch(command.cmd){
+            case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
+                    //Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
+                    command.leftSpeed = readDate16(msg, 8);
+                    axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768)*50/32768;//进行速度换算
+
+                    command.rightSpeed = readDate16(msg, 24);
+                    axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
+                break; 
+        default:
+            break;
+
+    }
+
+
+    //NVIC_SystemReset();//            case DRIVE_COMMAND1_POSITION://轮子位置设置0X02
+
+}
+#else
+
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
     // This functional way of handling the messages is neat and is much cleaner from
@@ -42,6 +93,8 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     if (validAxis) {
         axis->watchdog_feed();
         switch (cmd) {
+
+#if 0
             case MSG_CO_NMT_CTRL:
                 break;
             case MSG_CO_HEARTBEAT_CMD:
@@ -118,11 +171,13 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             case MSG_CLEAR_ERRORS:
                 clear_errors_callback(axis, msg);
                 break;
+#endif
             default:
                 break;
         }
     }
 }
+#endif
 
 void CANSimple::nmt_callback(Axis* axis, can_Message_t& msg) {
     // Not implemented
@@ -410,3 +465,4 @@ uint32_t CANSimple::get_node_id(uint32_t msgID) {
 uint8_t CANSimple::get_cmd_id(uint32_t msgID) {
     return (msgID & 0x01F);  // Bottom 5 bits
 }
+

@@ -36,8 +36,15 @@ class CANSimple {
 
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
-
    private:
+    // ovo-new
+    static uint8_t readDate8(const can_Message_t& msg, uint8_t index);
+    static uint16_t readDate16(const can_Message_t& msg, uint8_t index);
+    static uint32_t readDate32(const can_Message_t& msg, uint8_t index);
+
+
+
+
     static void nmt_callback(Axis* axis, can_Message_t& msg);
     static void estop_callback(Axis* axis, can_Message_t& msg);
     static void get_motor_error_callback(Axis* axis, can_Message_t& msg);
@@ -78,7 +85,11 @@ class CANSimple {
 };
 
 
-
+typedef struct canMessage_s{
+    uint8_t cmd;
+    uint16_t leftSpeed;
+    uint16_t rightSpeed;
+} canMessage_t;
 
 
 #endif
