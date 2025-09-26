@@ -39,10 +39,8 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
 
     txmsg.isExt = true;
     txmsg.len = 5;
-    //encoder = axis->controller_.pos_estimate_circular_src_->any().value_or(0.0f)*65536.0f;//计算位置
-    //Speed = ((axis->controller_.vel_estimate_src_->any().value_or(0.0f))*60 + 32768.0f);
-    encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;
-    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);
+    encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;//计算位置
+    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
 
     txmsg.buf[0] = 0x09;//状态码
     txmsg.buf[1] = encoder >> 8;
@@ -60,19 +58,19 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     axes[1]->watchdog_feed();
 
     switch(command.cmd){
-            case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
-                    //Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
-                    command.leftSpeed = readDate16(msg, 8);
-                    axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768)*50/32768;//进行速度换算
+        case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
+            //Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
+            command.leftSpeed = readDate16(msg, 8);
+            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768)*50/32768;//进行速度换算
 
-                    command.rightSpeed = readDate16(msg, 24);
-                    axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
-                break; 
+            command.rightSpeed = readDate16(msg, 24);
+            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
+        break; 
 
-            case DRIVE_COMMAND0_GET_SPEED://速度查询
-                sendMotorSpeed(axes[0],2);//返回转子位置以及速度
-                sendMotorSpeed(axes[1],3);
-            break;
+        case DRIVE_COMMAND0_GET_SPEED://速度查询
+            sendMotorSpeed(axes[0],2);//返回转子位置以及速度
+            sendMotorSpeed(axes[1],3);
+        break;
 
         case DRIVE_CLEAR_ERRORS://异常状态清除
             clear_errors_callback(axes[0], msg);
