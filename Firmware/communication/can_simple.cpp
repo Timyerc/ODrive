@@ -32,7 +32,7 @@ uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index){
 //获取电机转速
 bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
     can_Message_t txmsg;
-    uint16_t Speed = 0;
+    int16_t Speed = 0;
     uint16_t encoder = 0;
 
     txmsg.id = motorNum;  // heartbeat ID
@@ -40,7 +40,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
     txmsg.isExt = true;
     txmsg.len = 5;
     encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;//计算位置
-    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
+    //Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
+    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);//计算速度
+
 
     txmsg.buf[0] = 0x09;//状态码
     txmsg.buf[1] = encoder >> 8;
@@ -73,10 +75,10 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
 
         case DRIVE_COMMAND0_GET_SPEED://速度查询
             if(axes[0],axes[0]->config_.can_node_id < 0x10){
-                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 1);//返回转子位置以及速度
+                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 1);
             }
             else{
-                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 2);//返回转子位置以及速度
+                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 2);
             }
             if(axes[0],axes[0]->config_.can_node_id < 0x10){
                 sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 2);
@@ -89,7 +91,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         case DRIVE_CLEAR_ERRORS://异常状态清除
             clear_errors_callback(axes[0], msg);
             clear_errors_callback(axes[1], msg);
-        break;
+            break;
         case DRIVE_MOTOR_CALIBRATION://电机自检
             axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
             axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
@@ -109,7 +111,6 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             break;
         default:
             break;
-
     }
 
             
