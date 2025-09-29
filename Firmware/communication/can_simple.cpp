@@ -52,25 +52,39 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
 }
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
+    if(msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id){
+        axes[0]->watchdog_feed();
+        axes[1]->watchdog_feed();
+    }
+    else{
+        return;
+    }
     canMessage_t command;
     command.cmd  = readDate8(msg, 0);
-    axes[0]->watchdog_feed();
-    axes[1]->watchdog_feed();
-
     switch(command.cmd){
         case DRIVE_COMMAND0_SPEED://轮子转速设置0X01
             //Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
             command.leftSpeed = readDate16(msg, 8);
-            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768)*50/32768;//进行速度换算
+            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->controller_.config_.vel_limit/32768;//进行速度换算
 
             command.rightSpeed = readDate16(msg, 24);
-            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768)*50/32768;//进行速度换算
-        break; 
+            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[0]->controller_.config_.vel_limit/32768;//进行速度换算
+            break; 
 
         case DRIVE_COMMAND0_GET_SPEED://速度查询
-            sendMotorSpeed(axes[0],2);//返回转子位置以及速度
-            sendMotorSpeed(axes[1],3);
-        break;
+            if(axes[0],axes[0]->config_.can_node_id < 0x10){
+                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 1);//返回转子位置以及速度
+            }
+            else{
+                sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 2);//返回转子位置以及速度
+            }
+            if(axes[0],axes[0]->config_.can_node_id < 0x10){
+                sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 2);
+            }
+            else{
+                sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 3);
+            }
+            break;
 
         case DRIVE_CLEAR_ERRORS://异常状态清除
             clear_errors_callback(axes[0], msg);
@@ -79,19 +93,19 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         case DRIVE_MOTOR_CALIBRATION://电机自检
             axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
             axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
-        break;
+            break;
         case DRIVE_ENCODER_OFFSET_CALIBRATION://编码器校准
-                axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-                axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
             break;
 
         case DRIVE_CLOSED_LOOP_CONTROL://进入闭环模式
-                axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-                axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
             break;
         case DRIVE_IDLE_MODE://空闲模式
-                axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
-                axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
+            axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
             break;
         default:
             break;
