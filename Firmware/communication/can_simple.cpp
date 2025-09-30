@@ -41,8 +41,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
     txmsg.len = 5;
     encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;//计算位置
     //Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
-    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);//计算速度
+    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);//计算速度*极对数
 
+    Speed = std::abs(Speed);//求绝对值
 
     txmsg.buf[0] = 0x09;//状态码
     txmsg.buf[1] = encoder >> 8;
