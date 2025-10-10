@@ -43,7 +43,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
     //Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
     Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);//计算速度*极对数
 
-    Speed = std::abs(Speed);//求绝对值
+    if (txmsg.id == 0x02 || txmsg.id == 0x11) {
+        Speed = -Speed;
+    }
 
     txmsg.buf[0] = 0x09;//状态码
     txmsg.buf[1] = encoder >> 8;
@@ -75,13 +77,15 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             break; 
 
         case DRIVE_COMMAND0_GET_SPEED://速度查询
-            if(axes[0],axes[0]->config_.can_node_id < 0x10){
+            command.SpeedRequst = readDate8(msg, 8);
+            
+            if (axes[0], axes[0]->config_.can_node_id < 0x10 && command.SpeedRequst == 0x01) {
                 sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 1);
             }
             else{
                 sendMotorSpeed(axes[0],axes[0]->config_.can_node_id + 2);
             }
-            if(axes[0],axes[0]->config_.can_node_id < 0x10){
+            if (axes[0], axes[0]->config_.can_node_id < 0x10 && command.SpeedRequst == 0x02) {
                 sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 2);
             }
             else{

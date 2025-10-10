@@ -89,6 +89,7 @@ typedef struct canMessage_s{
     uint8_t cmd;
     uint16_t leftSpeed;
     uint16_t rightSpeed;
+    uint8_t SpeedRequst;
 } canMessage_t;
 
 
