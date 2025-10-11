@@ -88,7 +88,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             if (axes[0], axes[0]->config_.can_node_id < 0x10 && command.SpeedRequst == 0x02) {
                 sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 2);
             }
-            else{
+            else if (command.SpeedRequst == 0x02) {
                 sendMotorSpeed(axes[1],axes[1]->config_.can_node_id + 3);
             }
             break;
