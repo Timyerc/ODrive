@@ -47,7 +47,16 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
         Speed = -Speed;
     }
 
-    txmsg.buf[0] = 0x09;//状态码
+    //状态码
+    if(axis->motor_.error_){
+    txmsg.buf[0] = 0x08;//电机故障
+    }else if(axis->encoder_.error_){
+    txmsg.buf[0] = 0x05;//霍尔故障
+    }else if(axis->sensorless_estimator_.error_){
+    txmsg.buf[0] = 0x03;//电机过流
+    }else{
+        txmsg.buf[0] = 0x09;//正常状态
+    }
     txmsg.buf[1] = encoder >> 8;
     txmsg.buf[2] = encoder;
     txmsg.buf[3] = Speed >> 8;
@@ -72,12 +81,12 @@ void CANSimple::keepAlive(Axis* axis) {
     txmsg.isExt = axis->config_.can_node_id_extended;
     txmsg.len = 8;
 
-    // 发送保活消息
-    txmsg.buf[0] = num;
-    txmsg.buf[1] = num >> 8;
-    txmsg.buf[2] = num >> 16;
-    txmsg.buf[3] = num >> 24;
-    odCAN->write(txmsg);
+    // // 发送保活消息
+    // txmsg.buf[0] = num;
+    // txmsg.buf[1] = num >> 8;
+    // txmsg.buf[2] = num >> 16;
+    // txmsg.buf[3] = num >> 24;
+    // odCAN->write(txmsg);
 }
 
 
