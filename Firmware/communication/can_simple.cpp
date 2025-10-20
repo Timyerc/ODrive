@@ -56,7 +56,33 @@ bool CANSimple::sendMotorSpeed(Axis* axis,uint32_t motorNum) {
     return true;
 }
 
+uint32_t num = 0;
+void CANSimple::keepAlive(Axis* axis) {
+    //保活任务
+    num++;
+    if(num>=0x10){//1秒没有收到控制指令，停止电机
+        axes[0]->controller_.input_vel_ = 0;
+        axes[1]->controller_.input_vel_ = 0;
+        num = 0;
+        //停止电机
+    }
+    can_Message_t txmsg;
+    txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
+    txmsg.id += MSG_ODRIVE_HEARTBEAT;  // heartbeat ID
+    txmsg.isExt = axis->config_.can_node_id_extended;
+    txmsg.len = 8;
+
+    // 发送保活消息
+    txmsg.buf[0] = num;
+    txmsg.buf[1] = num >> 8;
+    txmsg.buf[2] = num >> 16;
+    txmsg.buf[3] = num >> 24;
+    odCAN->write(txmsg);
+}
+
+
 void CANSimple::handle_can_message(can_Message_t& msg) {
+    num = 0;//收到消息，清零保活计数
     if(msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id){
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
@@ -502,6 +528,7 @@ void CANSimple::get_vbus_voltage_callback(Axis* axis, can_Message_t& msg) {
 void CANSimple::clear_errors_callback(Axis* axis, can_Message_t& msg) {
     axis->clear_errors();
 }
+
 
 void CANSimple::send_heartbeat(Axis* axis) {
     can_Message_t txmsg;

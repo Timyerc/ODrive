@@ -36,6 +36,7 @@ class CANSimple {
 
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
+    static void keepAlive(Axis* axis);
    private:
     // ovo-new
     static uint8_t readDate8(const can_Message_t& msg, uint8_t index);

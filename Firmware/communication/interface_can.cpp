@@ -191,6 +191,7 @@ void ODriveCAN::send_heartbeat(Axis *axis) {
             switch (config_.protocol) {
                 case PROTOCOL_SIMPLE:
                     //CANSimple::send_heartbeat(axis);
+                    CANSimple::keepAlive(axis);
                     break;
             }
             axis->last_heartbeat_ = now;
