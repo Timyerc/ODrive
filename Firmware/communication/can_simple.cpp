@@ -131,6 +131,8 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         case DRIVE_CLEAR_ERRORS://异常状态清除
             clear_errors_callback(axes[0], msg);
             clear_errors_callback(axes[1], msg);
+            axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
             break;
         case DRIVE_MOTOR_CALIBRATION://电机自检
             axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
