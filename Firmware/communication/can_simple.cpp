@@ -108,16 +108,16 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         if (axes[0]->config_.can_node_id == 0x01) {  // 行走轮
 
             if (command.SpeedRequst == 0x01) {  // 左轮
-                sendMotorSpeed(axes[0], 2);
+                sendMotorSpeed(axes[0], 0x02);
             } else if (command.SpeedRequst == 0x02) {  // 右轮
-                sendMotorSpeed(axes[0], 3);
+                sendMotorSpeed(axes[0], 0x03);
             }
         }
-        else if (axes[0]->config_.can_node_id == 0x10) {  // 毛刷
+        if (axes[0]->config_.can_node_id == 0x10) {  // 毛刷
             if (command.SpeedRequst == 0x01) {            // 左毛刷
-                sendMotorSpeed(axes[0], 12);
+                sendMotorSpeed(axes[0], 0x12);
             } else if (command.SpeedRequst == 0x02) {  // 右毛刷
-                sendMotorSpeed(axes[0], 13);
+                sendMotorSpeed(axes[0], 0x13);
             }
         }
         break;
@@ -147,7 +147,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     default:
         break;
     }
-    // odCAN->write(msg);//返回接收到的数据
+    //odCAN->write(msg);//返回接收到的数据
 }
 #else
 
