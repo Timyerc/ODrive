@@ -49,14 +49,26 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
 
     // 状态码
     if (axis->motor_.error_) {
-        txmsg.len = 1;
+        txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
+        txmsg.buf[1] = axis->motor_.error_;
+        txmsg.buf[2] = axis->motor_.error_ >> 8;
+        txmsg.buf[3] = axis->motor_.error_ >> 16;
+        txmsg.buf[4] = axis->motor_.error_ >> 24;
     } else if (axis->encoder_.error_) {
-        txmsg.len = 1;
+        txmsg.len = 5;
         txmsg.buf[0] = 0x05;  // 霍尔故障
+        txmsg.buf[1] = axis->encoder_.error_;
+        txmsg.buf[2] = axis->encoder_.error_ >> 8;
+        txmsg.buf[3] = axis->encoder_.error_ >> 16;
+        txmsg.buf[4] = axis->encoder_.error_ >> 24;
     } else if (axis->sensorless_estimator_.error_) {
-        txmsg.len = 1;
+        txmsg.len = 5;
         txmsg.buf[0] = 0x03;  // 电机过流
+        txmsg.buf[1] = axis->sensorless_estimator_.error_;
+        txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 8;
+        txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 16;
+        txmsg.buf[4] = axis->sensorless_estimator_.error_ >> 24;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
@@ -125,6 +137,8 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
         clear_errors_callback(axes[0], msg);
         clear_errors_callback(axes[1], msg);
+        axes[0]->controller_.input_vel_ = 0;
+        axes[1]->controller_.input_vel_ = 0;
         axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
         axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
         break;
