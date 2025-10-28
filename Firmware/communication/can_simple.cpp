@@ -82,6 +82,8 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
+//#define ODRIVE_CAN_TEST
+
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
 // 保活任务
@@ -92,9 +94,26 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
+#ifdef ODRIVE_CAN_TEST
+    can_Message_t txmsg;
+    txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
+    txmsg.id += MSG_ODRIVE_HEARTBEAT;  // heartbeat ID
+    txmsg.isExt = axis->config_.can_node_id_extended;
+    txmsg.len = 8;
+
+    // Axis errors in 1st 32-bit value
+    txmsg.buf[0] = alive;
+    txmsg.buf[1] = alive >> 8;
+    txmsg.buf[2] = alive >> 16;
+    txmsg.buf[3] = alive >> 24;
+    odCAN->write(txmsg);
+#endif
 }
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
+#ifdef ODRIVE_CAN_TEST
+    odCAN->write(msg);//返回接收到的数据
+#endif
     alive = 0;  // 收到消息，清零保活计数
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
         axes[0]->watchdog_feed();
@@ -161,7 +180,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     default:
         break;
     }
-    //odCAN->write(msg);//返回接收到的数据
+
 }
 #else
 
