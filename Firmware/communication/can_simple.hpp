@@ -45,8 +45,8 @@ class CANSimple {
     static uint16_t readDate16(const can_Message_t& msg, uint8_t index);
     static uint32_t readDate32(const can_Message_t& msg, uint8_t index);
     static bool sendMotorSpeed(Axis* axis,uint32_t motorNum);
-    static void currentReturn(Axis* axis, uint32_t motorNum);
-
+    static void motor0_Overload_Protection(void);
+    static void motor1_Overload_Protection(void);
 
 
     static void nmt_callback(Axis* axis, can_Message_t& msg);

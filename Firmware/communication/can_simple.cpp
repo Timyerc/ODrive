@@ -82,22 +82,51 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
+#define FILTER_DEPTH 30 // 滤波深度
+#define PROTECT_CURRENT 1000 // 过流保护阈值，单位毫安
+#define PROTECT_TIME 30 // 保护时间，单位为100ms
+typedef struct
+{
+    uint8_t Countdown;//倒计时
+    uint8_t  Iq_Num;//滤波计数
+    float    Iq_Filter[FILTER_DEPTH];//滤波数组
+} Cur_Filter_t;
 
-void CANSimple::currentReturn(Axis* axis, uint32_t motorNum) {
 
+Cur_Filter_t m0_Cur;
+Cur_Filter_t m1_Cur;
+
+//过载保护，100ms检测一次M0电流数据
+void CANSimple::motor0_Overload_Protection(void) {
+    //平滑滤波
+    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Iq_measured;
+    m0_Cur.Iq_Num++;
+    if (m0_Cur.Iq_Num >= FILTER_DEPTH)
+        m0_Cur.Iq_Num = 0;
+    float m0_Iq_Sum = 0;
+    for(uint8_t i=0; i<FILTER_DEPTH; i++) {
+        m0_Iq_Sum += m0_Cur.Iq_Filter[i];
+    }
+    m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
+    //m0_Iq_Sum = -3.14159;  // 测试数据
+    bool isNegative = m0_Iq_Sum < 0;//判断正负
+    int32_t absoluteValue = m0_Iq_Sum * 1000.0f;//毫安
+    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
+
+    if(absoluteValue > PROTECT_CURRENT) {
+        m0_Cur.Countdown++;
+        if(m0_Cur.Countdown >= PROTECT_TIME) { //持续3秒以上
+            axes[0]->controller_.input_vel_ = 0;//速度清零
+        }
+    }
+    else {
+        m0_Cur.Countdown = 0;
+    }
+#if 0
     can_Message_t txmsg;
     txmsg.id = motorNum;
     txmsg.isExt = true;
     txmsg.len = 8;
-
-    float floatBytes;
-    floatBytes = axis->motor_.current_control_.Id_measured;
-    //floatBytes = -3.14159;  // 测试数据
-    // 处理负值（如果需要）
-    bool isNegative = floatBytes < 0;
-    int32_t absoluteValue = floatBytes * 1000.0f;//毫安
-
-    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));
     // 使用除法和模运算提取各位
     txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
     txmsg.buf[1] = (absoluteValue / 100000) % 10;
@@ -108,24 +137,33 @@ void CANSimple::currentReturn(Axis* axis, uint32_t motorNum) {
     txmsg.buf[6] = (absoluteValue / 10) % 10;
     txmsg.buf[7] = absoluteValue % 10;
     odCAN->write(txmsg);
+#endif
 
-    txmsg.id = motorNum + 1;
-    floatBytes = axis->motor_.current_control_.Iq_measured;
-    isNegative = floatBytes < 0;
-    absoluteValue = floatBytes * 1000.0f;//毫安
-    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));
-    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
-    txmsg.buf[1] = (absoluteValue / 100000) % 10;
-    txmsg.buf[2] = (absoluteValue / 10000) % 10;
-    txmsg.buf[3] = (absoluteValue / 1000) % 10;
-    txmsg.buf[4] = 0xaa; // 小数点位置标志
-    txmsg.buf[5] = (absoluteValue / 100) % 10;
-    txmsg.buf[6] = (absoluteValue / 10) % 10;
-    txmsg.buf[7] = absoluteValue % 10;
-    odCAN->write(txmsg);
-    
 }
-
+//过载保护，100ms检测一次电流数据
+void CANSimple::motor1_Overload_Protection(void) {
+    //平滑滤波
+    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Iq_measured;
+    m1_Cur.Iq_Num++;
+    if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
+    float m1_Iq_Sum = 0;
+    for(uint8_t i=0; i<FILTER_DEPTH; i++) {
+        m1_Iq_Sum += m1_Cur.Iq_Filter[i];
+    }
+    m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
+    bool isNegative = m1_Iq_Sum < 0;//判断正负
+    int32_t absoluteValue = m1_Iq_Sum * 1000.0f;//毫安
+    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
+    if(absoluteValue > PROTECT_CURRENT) {
+        m1_Cur.Countdown++;
+        if(m1_Cur.Countdown >= PROTECT_TIME) { //持续3秒以上
+            axes[1]->controller_.input_vel_ = 0;//速度清零
+        }
+    }
+    else {
+        m1_Cur.Countdown = 0;
+    }
+}
 //#define ODRIVE_CAN_TEST
 
 // 定义静态成员变量
@@ -138,8 +176,8 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    // currentReturn( axes[0], 0x05);
-    currentReturn( axes[1], 0x08);
+    motor0_Overload_Protection();
+    motor1_Overload_Protection();
 
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
