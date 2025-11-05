@@ -82,6 +82,50 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
+
+void CANSimple::currentReturn(Axis* axis, uint32_t motorNum) {
+
+    can_Message_t txmsg;
+    txmsg.id = motorNum;
+    txmsg.isExt = true;
+    txmsg.len = 8;
+
+    float floatBytes;
+    floatBytes = axis->motor_.current_control_.Id_measured;
+    //floatBytes = -3.14159;  // 测试数据
+    // 处理负值（如果需要）
+    bool isNegative = floatBytes < 0;
+    int32_t absoluteValue = floatBytes * 1000.0f;//毫安
+
+    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));
+    // 使用除法和模运算提取各位
+    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
+    txmsg.buf[1] = (absoluteValue / 100000) % 10;
+    txmsg.buf[2] = (absoluteValue / 10000) % 10;
+    txmsg.buf[3] = (absoluteValue / 1000) % 10;
+    txmsg.buf[4] = 0xaa; // 小数点位置标志
+    txmsg.buf[5] = (absoluteValue / 100) % 10;
+    txmsg.buf[6] = (absoluteValue / 10) % 10;
+    txmsg.buf[7] = absoluteValue % 10;
+    odCAN->write(txmsg);
+
+    txmsg.id = motorNum + 1;
+    floatBytes = axis->motor_.current_control_.Iq_measured;
+    isNegative = floatBytes < 0;
+    absoluteValue = floatBytes * 1000.0f;//毫安
+    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));
+    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
+    txmsg.buf[1] = (absoluteValue / 100000) % 10;
+    txmsg.buf[2] = (absoluteValue / 10000) % 10;
+    txmsg.buf[3] = (absoluteValue / 1000) % 10;
+    txmsg.buf[4] = 0xaa; // 小数点位置标志
+    txmsg.buf[5] = (absoluteValue / 100) % 10;
+    txmsg.buf[6] = (absoluteValue / 10) % 10;
+    txmsg.buf[7] = absoluteValue % 10;
+    odCAN->write(txmsg);
+    
+}
+
 //#define ODRIVE_CAN_TEST
 
 // 定义静态成员变量
@@ -94,6 +138,9 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
+    // currentReturn( axes[0], 0x05);
+    currentReturn( axes[1], 0x08);
+
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
@@ -180,7 +227,6 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     default:
         break;
     }
-
 }
 #else
 
