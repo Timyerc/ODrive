@@ -83,8 +83,8 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
 }
 
 #define FILTER_DEPTH 30 // 滤波深度
-#define PROTECT_CURRENT 1000 // 过流保护阈值，单位毫安
-#define PROTECT_TIME 30 // 保护时间，单位为100ms
+// #define PROTECT_CURRENT 1000 // 过流保护阈值，单位毫安
+// #define PROTECT_TIME 30 // 保护时间，单位为100ms
 typedef struct
 {
     uint8_t Countdown;//倒计时
@@ -95,6 +95,7 @@ typedef struct
 
 Cur_Filter_t m0_Cur;
 Cur_Filter_t m1_Cur;
+extern ODriveCAN::Config_t can_config;
 
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
@@ -113,15 +114,16 @@ void CANSimple::motor0_Overload_Protection(void) {
     int32_t absoluteValue = m0_Iq_Sum * 1000.0f;//毫安
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
 
-    if(absoluteValue > PROTECT_CURRENT) {
+    if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
-        if(m0_Cur.Countdown >= PROTECT_TIME) { //持续3秒以上
+        if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
             axes[0]->controller_.input_vel_ = 0;//速度清零
         }
     }
     else {
         m0_Cur.Countdown = 0;
     }
+
 #if 0
     can_Message_t txmsg;
     txmsg.id = motorNum;
@@ -154,9 +156,9 @@ void CANSimple::motor1_Overload_Protection(void) {
     bool isNegative = m1_Iq_Sum < 0;//判断正负
     int32_t absoluteValue = m1_Iq_Sum * 1000.0f;//毫安
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
-    if(absoluteValue > PROTECT_CURRENT) {
+    if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
-        if(m1_Cur.Countdown >= PROTECT_TIME) { //持续3秒以上
+        if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
             axes[1]->controller_.input_vel_ = 0;//速度清零
         }
     }
@@ -193,6 +195,45 @@ void CANSimple::keepAlive(Axis* axis) {
     txmsg.buf[3] = alive >> 24;
     odCAN->write(txmsg);
 #endif
+}
+// 获取电机电流阈值
+void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
+{
+    can_Message_t txmsg;
+    txmsg.id = msg_id;
+    txmsg.isExt = true;
+    txmsg.len = 5;
+
+    txmsg.buf[0] = motorNum;
+    if(motorNum == 0x0) {//获取两个电机的电流阈值
+        txmsg.buf[1] = axes[0]->config_.heartbeat_rate_ms >> 8;
+        txmsg.buf[2] = axes[0]->config_.heartbeat_rate_ms;
+        txmsg.buf[3] = axes[0]->config_.current_threshold_mA >> 8;
+        txmsg.buf[4] = axes[0]->config_.current_threshold_mA;
+    }
+    else if(motorNum == 0x1) {//获取单个电机的电流阈值
+        txmsg.buf[1] = axes[1]->config_.heartbeat_rate_ms >> 8;
+        txmsg.buf[2] = axes[1]->config_.heartbeat_rate_ms;
+        txmsg.buf[3] = axes[1]->config_.current_threshold_mA >> 8;
+        txmsg.buf[4] = axes[1]->config_.current_threshold_mA;
+    }
+    odCAN->write(txmsg);
+}
+// 设置电机电流阈值
+void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id,uint16_t rate_ms, uint16_t current_mA)
+{
+    if(current_mA < 100 || rate_ms < 1 || motorNum > 1) return; //最小100毫安，最小100ms
+    if(motorNum == 0x0) {//设置电机0的电流阈值
+        axes[0]->config_.heartbeat_rate_ms = rate_ms;
+        axes[0]->config_.current_threshold_mA = current_mA;
+    }
+    else if(motorNum == 0x1) {//设置电机1的电流阈值
+        axes[1]->config_.heartbeat_rate_ms = rate_ms;
+        axes[1]->config_.current_threshold_mA = current_mA;
+    }
+    get_motor_current_threshold(motorNum, msg_id);//返回设置结果
+    odrv.save_configuration();
+    odrv.reboot();
 }
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
@@ -237,7 +278,12 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             }
         }
         break;
-
+    case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
+        set_motor_current_threshold(readDate8(msg, 8),0x14,readDate16(msg, 16),readDate16(msg, 32));
+        break;
+    case DRIVE__GET_CURRENT_THRESHOLD:  // 获取电机电流阈值
+        get_motor_current_threshold(readDate8(msg, 8),0x14);
+        break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
         clear_errors_callback(axes[0], msg);
         clear_errors_callback(axes[1], msg);

@@ -99,12 +99,20 @@
 #define DRIVE_COMMAND0_GET_REVVERSE     0XE2    //暂时不做处理
 #define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
 
-
-#define DRIVE_CLEAR_ERRORS                0xC0  //电机错误状态清除
-#define DRIVE_MOTOR_CALIBRATION           0xCC  //电机校准
-#define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCD  //编码器校准
-#define DRIVE_CLOSED_LOOP_CONTROL         0xCE  //进入闭环模式
-#define DRIVE_IDLE_MODE                   0xCF  //进入空闲模式
+typedef enum {
+    DRIVE_CLEAR_ERRORS = 0xC0,                //电机错误状态清除
+    DRIVE__SET_CURRENT_THRESHOLD = 0xCA,      //设置电机过载电流阈值
+    DRIVE__GET_CURRENT_THRESHOLD = 0xCB,      //获取电机过载电流阈值
+    DRIVE_MOTOR_CALIBRATION = 0xCC,           //电机校准
+    DRIVE_ENCODER_OFFSET_CALIBRATION = 0xCD,  //编码器校准
+    DRIVE_CLOSED_LOOP_CONTROL = 0xCE,         //进入闭环模式
+    DRIVE_IDLE_MODE = 0xCF,                   //进入空闲模式
+} DRIVE_CMD_ENUM;
+// #define DRIVE_CLEAR_ERRORS                0xC0  //电机错误状态清除
+// #define DRIVE_MOTOR_CALIBRATION           0xCC  //电机校准
+// #define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCD  //编码器校准
+// #define DRIVE_CLOSED_LOOP_CONTROL         0xCE  //进入闭环模式
+// #define DRIVE_IDLE_MODE                   0xCF  //进入空闲模式
 // recve cmd end
 /* USER CODE END Includes */
 
