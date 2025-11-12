@@ -92,18 +92,19 @@ typedef struct
     float    Iq_Filter[FILTER_DEPTH];//滤波数组
 } Cur_Filter_t;
 
+Cur_Filter_t m0_Cur;
+Cur_Filter_t m1_Cur;
+extern ODriveCAN::Config_t can_config;
+
 // 电流过载故障处理
 void CANSimple::motor_current_fault(void) {
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         safety_critical_disarm_motor_pwm(axes[i]->motor_);// 关闭PWM输出
-        axes[0]->controller_.input_vel_ = 0;//速度清零
+        axes[i]->controller_.input_vel_ = 0;//速度清零
+        axes[i]->motor_.current_control_.Iq_measured = 0.0f;//测量电流清零
         axes[i]->motor_.error_ |= Motor::ERROR_DC_BUS_OVER_CURRENT;// 设置过流错误标志
     }
 }
-
-Cur_Filter_t m0_Cur;
-Cur_Filter_t m1_Cur;
-extern ODriveCAN::Config_t can_config;
 
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
@@ -131,24 +132,6 @@ void CANSimple::motor0_Overload_Protection(void) {
     else {
         m0_Cur.Countdown = 0;
     }
-
-#if 0
-    can_Message_t txmsg;
-    txmsg.id = motorNum;
-    txmsg.isExt = true;
-    txmsg.len = 8;
-    // 使用除法和模运算提取各位
-    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
-    txmsg.buf[1] = (absoluteValue / 100000) % 10;
-    txmsg.buf[2] = (absoluteValue / 10000) % 10;
-    txmsg.buf[3] = (absoluteValue / 1000) % 10;
-    txmsg.buf[4] = 0xaa; // 小数点位置标志
-    txmsg.buf[5] = (absoluteValue / 100) % 10;
-    txmsg.buf[6] = (absoluteValue / 10) % 10;
-    txmsg.buf[7] = absoluteValue % 10;
-    odCAN->write(txmsg);
-#endif
-
 }
 
 //过载保护，100ms检测一次电流数据
@@ -174,6 +157,23 @@ void CANSimple::motor1_Overload_Protection(void) {
     else {
         m1_Cur.Countdown = 0;
     }
+
+#if 0
+    can_Message_t txmsg;
+    txmsg.id = motorNum;
+    txmsg.isExt = true;
+    txmsg.len = 8;
+    // 使用除法和模运算提取各位
+    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
+    txmsg.buf[1] = (absoluteValue / 100000) % 10;
+    txmsg.buf[2] = (absoluteValue / 10000) % 10;
+    txmsg.buf[3] = (absoluteValue / 1000) % 10;
+    txmsg.buf[4] = 0xaa; // 小数点位置标志
+    txmsg.buf[5] = (absoluteValue / 100) % 10;
+    txmsg.buf[6] = (absoluteValue / 10) % 10;
+    txmsg.buf[7] = absoluteValue % 10;
+    odCAN->write(txmsg);
+#endif
 }
 //#define ODRIVE_CAN_TEST
 
