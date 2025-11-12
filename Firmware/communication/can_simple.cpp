@@ -142,6 +142,16 @@ void CANSimple::motor0_Overload_Protection(void) {
 #endif
 
 }
+// 电流过载故障处理
+static void can_current_fault(Motor::Error error) {
+    // Disable all motors NOW!
+    for (size_t i = 0; i < AXIS_COUNT; ++i) {
+        safety_critical_disarm_motor_pwm(axes[i]->motor_);
+        axes[i]->motor_.error_ |= error;
+    }
+    safety_critical_disarm_brake_resistor();
+}
+
 //过载保护，100ms检测一次电流数据
 void CANSimple::motor1_Overload_Protection(void) {
     //平滑滤波
@@ -160,6 +170,7 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Cur.Countdown++;
         if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
             axes[1]->controller_.input_vel_ = 0;//速度清零
+            can_current_fault(Motor::ERROR_DC_BUS_OVER_CURRENT);
         }
     }
     else {
