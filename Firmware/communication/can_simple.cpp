@@ -314,7 +314,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         get_motor_current_threshold(readDate8(msg, 8),DRIVE__GET_CURRENT_THRESHOLD);
         break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
-        if(readDate16(msg, 16)){
+        if(!readDate16(msg, 16)){
             clear_errors_callback(axes[0], msg);
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
