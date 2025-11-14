@@ -69,6 +69,20 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 8;
         txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 16;
         txmsg.buf[4] = axis->sensorless_estimator_.error_ >> 24;
+    } else if (axis->controller_.error_) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x01;  // 
+        txmsg.buf[1] = axis->controller_.error_;
+        txmsg.buf[2] = axis->controller_.error_ >> 8;
+        txmsg.buf[3] = axis->controller_.error_ >> 16;
+        txmsg.buf[4] = axis->controller_.error_ >> 24;
+    } else if (axis->error_) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x02;  // 
+        txmsg.buf[1] = axis->error_;
+        txmsg.buf[2] = axis->error_ >> 8;
+        txmsg.buf[3] = axis->error_ >> 16;
+        txmsg.buf[4] = axis->error_ >> 24;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
@@ -77,6 +91,12 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[3] = Speed >> 8;
         txmsg.buf[4] = Speed;
     }
+        //axis->motor_.error_ = Motor::ERROR_NONE;
+        //axis->controller_.error_ = Controller::ERROR_NONE;
+        //axis->sensorless_estimator_.error_ = SensorlessEstimator::ERROR_NONE;
+        //axis->encoder_.error_ = Encoder::ERROR_NONE;
+        //axis->encoder_.spi_error_rate_ = 0.0f;
+        //axis->error_ = Axis::ERROR_NONE;
 
     odCAN->write(txmsg);  // 返回发送的数据
     return true;
@@ -209,22 +229,23 @@ void CANSimple::keepAlive(Axis* axis) {
 void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
 {
     can_Message_t txmsg;
-    txmsg.id = msg_id;
+    txmsg.id = 0x01;
     txmsg.isExt = true;
-    txmsg.len = 5;
+    txmsg.len = 6;
 
-    txmsg.buf[0] = motorNum;
+    txmsg.buf[0] = msg_id;
+    txmsg.buf[1] = motorNum;
     if(motorNum == 0x0) {//获取两个电机的电流阈值
-        txmsg.buf[1] = axes[0]->config_.heartbeat_rate_ms >> 8;
-        txmsg.buf[2] = axes[0]->config_.heartbeat_rate_ms;
-        txmsg.buf[3] = axes[0]->config_.current_threshold_mA >> 8;
-        txmsg.buf[4] = axes[0]->config_.current_threshold_mA;
+        txmsg.buf[2] = axes[0]->config_.heartbeat_rate_ms >> 8;
+        txmsg.buf[3] = axes[0]->config_.heartbeat_rate_ms;
+        txmsg.buf[4] = axes[0]->config_.current_threshold_mA >> 8;
+        txmsg.buf[5] = axes[0]->config_.current_threshold_mA;
     }
     else if(motorNum == 0x1) {//获取单个电机的电流阈值
-        txmsg.buf[1] = axes[1]->config_.heartbeat_rate_ms >> 8;
-        txmsg.buf[2] = axes[1]->config_.heartbeat_rate_ms;
-        txmsg.buf[3] = axes[1]->config_.current_threshold_mA >> 8;
-        txmsg.buf[4] = axes[1]->config_.current_threshold_mA;
+        txmsg.buf[2] = axes[1]->config_.heartbeat_rate_ms >> 8;
+        txmsg.buf[3] = axes[1]->config_.heartbeat_rate_ms;
+        txmsg.buf[4] = axes[1]->config_.current_threshold_mA >> 8;
+        txmsg.buf[5] = axes[1]->config_.current_threshold_mA;
     }
     odCAN->write(txmsg);
 }
@@ -272,26 +293,25 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         command.SpeedRequst = readDate8(msg, 8);
 
         if (axes[0]->config_.can_node_id == 0x01) {  // 行走轮
-
             if (command.SpeedRequst == 0x01) {  // 左轮
                 sendMotorSpeed(axes[0], 0x02);
             } else if (command.SpeedRequst == 0x02) {  // 右轮
-                sendMotorSpeed(axes[0], 0x03);
+                sendMotorSpeed(axes[1], 0x03);
             }
         }
         if (axes[0]->config_.can_node_id == 0x10) {  // 毛刷
             if (command.SpeedRequst == 0x01) {            // 左毛刷
                 sendMotorSpeed(axes[0], 0x12);
             } else if (command.SpeedRequst == 0x02) {  // 右毛刷
-                sendMotorSpeed(axes[0], 0x13);
+                sendMotorSpeed(axes[1], 0x13);
             }
         }
         break;
     case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
-        set_motor_current_threshold(readDate8(msg, 8),0x14,readDate16(msg, 16),readDate16(msg, 32));
+        set_motor_current_threshold(readDate8(msg, 8),DRIVE__SET_CURRENT_THRESHOLD,readDate16(msg, 16),readDate16(msg, 32));
         break;
     case DRIVE__GET_CURRENT_THRESHOLD:  // 获取电机电流阈值
-        get_motor_current_threshold(readDate8(msg, 8),0x14);
+        get_motor_current_threshold(readDate8(msg, 8),DRIVE__GET_CURRENT_THRESHOLD);
         break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
         clear_errors_callback(axes[0], msg);
