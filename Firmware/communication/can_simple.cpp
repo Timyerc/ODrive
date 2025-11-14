@@ -314,12 +314,16 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         get_motor_current_threshold(readDate8(msg, 8),DRIVE__GET_CURRENT_THRESHOLD);
         break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
-        clear_errors_callback(axes[0], msg);
-        clear_errors_callback(axes[1], msg);
-        axes[0]->controller_.input_vel_ = 0;
-        axes[1]->controller_.input_vel_ = 0;
-        axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-        axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        if(readDate16(msg, 16)){
+            clear_errors_callback(axes[0], msg);
+            axes[0]->controller_.input_vel_ = 0;
+            axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        }
+        else {
+            clear_errors_callback(axes[1], msg);
+            axes[1]->controller_.input_vel_ = 0;
+            axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        }
         break;
     case DRIVE_MOTOR_CALIBRATION:  // 电机自检
         axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
