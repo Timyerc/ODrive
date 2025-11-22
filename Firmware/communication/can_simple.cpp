@@ -102,9 +102,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
+//#define ODRIVE_CUR_DEBUG
 #define FILTER_DEPTH 30 // 滤波深度
-// #define PROTECT_CURRENT 1000 // 过流保护阈值，单位毫安
-// #define PROTECT_TIME 30 // 保护时间，单位为100ms
+
 typedef struct
 {
     uint8_t Countdown;//倒计时
@@ -140,7 +140,7 @@ void CANSimple::motor0_Overload_Protection(void) {
     m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
     //m0_Iq_Sum = -3.14159;  // 测试数据
     bool isNegative = m0_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m0_Iq_Sum * 1000.0f;//毫安
+    int32_t absoluteValue = m0_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
 
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
@@ -152,6 +152,22 @@ void CANSimple::motor0_Overload_Protection(void) {
     else {
         m0_Cur.Countdown = 0;
     }
+#ifdef ODRIVE_CUR_DEBUG
+    can_Message_t txmsg;
+    txmsg.id = 14;
+    txmsg.isExt = true;
+    txmsg.len = 8;
+    // 使用除法和模运算提取各位
+    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
+    txmsg.buf[1] = (absoluteValue / 100000) % 10;
+    txmsg.buf[2] = (absoluteValue / 10000) % 10;
+    txmsg.buf[3] = (absoluteValue / 1000) % 10;
+    txmsg.buf[4] = 0xaa; // 小数点位置标志
+    txmsg.buf[5] = (absoluteValue / 100) % 10;
+    txmsg.buf[6] = (absoluteValue / 10) % 10;
+    txmsg.buf[7] = absoluteValue % 10;
+    odCAN->write(txmsg);
+#endif
 }
 
 //过载保护，100ms检测一次电流数据
@@ -166,7 +182,7 @@ void CANSimple::motor1_Overload_Protection(void) {
     }
     m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
     bool isNegative = m1_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m1_Iq_Sum * 1000.0f;//毫安
+    int32_t absoluteValue = m1_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
@@ -178,9 +194,9 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Cur.Countdown = 0;
     }
 
-#if 0
+#ifdef ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = motorNum;
+    txmsg.id = 15;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -270,10 +286,11 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
 #ifdef ODRIVE_CAN_TEST
     odCAN->write(msg);//返回接收到的数据
 #endif
-    alive = 0;  // 收到消息，清零保活计数
+
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
+        alive = 0;  // 收到消息，清零保活计数
     } else {
         return;
     }
