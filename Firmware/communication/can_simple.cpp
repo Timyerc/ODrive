@@ -142,7 +142,6 @@ void CANSimple::motor0_Overload_Protection(void) {
     bool isNegative = m0_Iq_Sum < 0;//判断正负
     int32_t absoluteValue = m0_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
-
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
         if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
@@ -154,7 +153,7 @@ void CANSimple::motor0_Overload_Protection(void) {
     }
 #ifdef ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = 14;
+    txmsg.id = axis->config_.can_node_id + 2;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -196,7 +195,7 @@ void CANSimple::motor1_Overload_Protection(void) {
 
 #ifdef ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = 15;
+    txmsg.id = axis->config_.can_node_id + 3;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -342,21 +341,24 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
         }
         break;
-    case DRIVE_MOTOR_CALIBRATION:  // 电机自检
-        axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
-        axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
-        break;
-    case DRIVE_ENCODER_OFFSET_CALIBRATION:  // 编码器校准
-        axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-        axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-        break;
-    case DRIVE_CLOSED_LOOP_CONTROL:  // 进入闭环模式
-        axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-        axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-        break;
-    case DRIVE_IDLE_MODE:  // 空闲模式
-        axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
-        axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
+    // case DRIVE_MOTOR_CALIBRATION:  // 电机自检
+    //     axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+    //     axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
+    //     break;
+    // case DRIVE_ENCODER_OFFSET_CALIBRATION:  // 编码器校准
+    //     axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+    //     axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+    //     break;
+    // case DRIVE_CLOSED_LOOP_CONTROL:  // 进入闭环模式
+    //     axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+    //     axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+    //     break;
+    // case DRIVE_IDLE_MODE:  // 空闲模式
+    //     axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
+    //     axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
+    //     break;
+    case DRIVE_RESTART:  // 重新启动
+        odrv.reboot();
         break;
     default:
         break;
