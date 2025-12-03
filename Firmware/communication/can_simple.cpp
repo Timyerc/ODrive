@@ -153,7 +153,7 @@ void CANSimple::motor0_Overload_Protection(void) {
     }
 #ifdef ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = axes[0]->config_.can_node_id + 2;
+    txmsg.id = axes[0]->config_.can_node_id + 3;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -195,7 +195,7 @@ void CANSimple::motor1_Overload_Protection(void) {
 
 #ifdef ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = axes[1]->config_.can_node_id + 3;
+    txmsg.id = axes[1]->config_.can_node_id + 4;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -222,8 +222,8 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    motor0_Overload_Protection();
-    motor1_Overload_Protection();
+    // motor0_Overload_Protection();
+    // motor1_Overload_Protection();
 
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
