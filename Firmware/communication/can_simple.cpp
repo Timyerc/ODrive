@@ -102,7 +102,7 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
-//#define ODRIVE_CUR_DEBUG
+#define ODRIVE_CUR_DEBUG
 #define FILTER_DEPTH 30 // 滤波深度
 
 typedef struct
@@ -129,7 +129,7 @@ void CANSimple::motor_current_fault(void) {
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
     //平滑滤波
-    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Iq_measured;
+    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Ibus;
     m0_Cur.Iq_Num++;
     if (m0_Cur.Iq_Num >= FILTER_DEPTH)
         m0_Cur.Iq_Num = 0;
@@ -140,7 +140,7 @@ void CANSimple::motor0_Overload_Protection(void) {
     m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
     //m0_Iq_Sum = -3.14159;  // 测试数据
     bool isNegative = m0_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m0_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
+    int32_t absoluteValue = m0_Iq_Sum * 1000.0f / 0.98;//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
@@ -172,7 +172,7 @@ void CANSimple::motor0_Overload_Protection(void) {
 //过载保护，100ms检测一次电流数据
 void CANSimple::motor1_Overload_Protection(void) {
     //平滑滤波
-    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Iq_measured;
+    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Ibus;
     m1_Cur.Iq_Num++;
     if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
     float m1_Iq_Sum = 0;
@@ -181,7 +181,7 @@ void CANSimple::motor1_Overload_Protection(void) {
     }
     m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
     bool isNegative = m1_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m1_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
+    int32_t absoluteValue = m1_Iq_Sum * 1000.0f / 0.98;//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
@@ -222,8 +222,8 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    // motor0_Overload_Protection();
-    // motor1_Overload_Protection();
+    motor0_Overload_Protection();
+    motor1_Overload_Protection();
 
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
