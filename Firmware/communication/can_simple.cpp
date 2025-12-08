@@ -7,8 +7,14 @@
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
-#define USE_USER_CAN_CALLBACKS 1
-#if USE_USER_CAN_CALLBACKS
+#define USE_USER_CAN_CALLBACKS
+//#define ODRIVE_CAN_TEST
+#define ODRIVE_CUR_DEBUG
+#define FILTER_DEPTH 30 // 滤波深度
+
+
+
+#ifdef USE_USER_CAN_CALLBACKS
 uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index) {
     uint8_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true);
@@ -91,19 +97,10 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[3] = Speed >> 8;
         txmsg.buf[4] = Speed;
     }
-        //axis->motor_.error_ = Motor::ERROR_NONE;
-        //axis->controller_.error_ = Controller::ERROR_NONE;
-        //axis->sensorless_estimator_.error_ = SensorlessEstimator::ERROR_NONE;
-        //axis->encoder_.error_ = Encoder::ERROR_NONE;
-        //axis->encoder_.spi_error_rate_ = 0.0f;
-        //axis->error_ = Axis::ERROR_NONE;
-
     odCAN->write(txmsg);  // 返回发送的数据
     return true;
 }
 
-#define ODRIVE_CUR_DEBUG
-#define FILTER_DEPTH 30 // 滤波深度
 
 typedef struct
 {
@@ -210,7 +207,6 @@ void CANSimple::motor1_Overload_Protection(void) {
     odCAN->write(txmsg);
 #endif
 }
-//#define ODRIVE_CAN_TEST
 
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
@@ -222,8 +218,9 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    motor0_Overload_Protection();
-    motor1_Overload_Protection();
+  
+    // motor0_Overload_Protection();
+    // motor1_Overload_Protection();
 
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
