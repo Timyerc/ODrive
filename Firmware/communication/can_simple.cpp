@@ -91,13 +91,6 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[3] = Speed >> 8;
         txmsg.buf[4] = Speed;
     }
-        //axis->motor_.error_ = Motor::ERROR_NONE;
-        //axis->controller_.error_ = Controller::ERROR_NONE;
-        //axis->sensorless_estimator_.error_ = SensorlessEstimator::ERROR_NONE;
-        //axis->encoder_.error_ = Encoder::ERROR_NONE;
-        //axis->encoder_.spi_error_rate_ = 0.0f;
-        //axis->error_ = Axis::ERROR_NONE;
-
     odCAN->write(txmsg);  // 返回发送的数据
     return true;
 }
