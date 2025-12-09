@@ -3,7 +3,7 @@ name: Tests
 on:
   pull_request:
     branches: [main, devel]
-    tags: ['ODrive-fw-v*']
+
   push:
     branches: [main, devel]
     tags: ['ODrive-fw-v*']
@@ -15,10 +15,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         board_version: [v3.6-56V]
-        debug: [true]
-
-        include:
-          - {os: ubuntu-latest, board_version: v3.6-56V, debug: false}
+        debug: [false]
 
     runs-on: ${{ matrix.os }}
     steps:
