@@ -48,7 +48,6 @@ jobs:
 
           sudo apt install python3 python3-yaml python3-jinja2 python3-jsonschema
 
-      steps:
       - name: Install GNU Arm Embedded Toolchain - ${{ matrix.gcc }}
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
