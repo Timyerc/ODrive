@@ -1,0 +1,74 @@
+{
+    "categories": [
+        {
+            "title": "## 🚀 Features",
+            "labels": [
+                "feature"
+            ]
+        },
+        {
+            "title": "## 🪄 Enhancements",
+            "labels": [
+                "enhancement"
+            ]
+        },
+        {
+            "title": "## 🐛 Fixes",
+            "labels": [
+                "fix",
+                "bug"
+            ]
+        },
+        {
+            "title": "## 🧪 Tests",
+            "labels": [
+                "test"
+            ]
+        },
+        {
+            "title": "## 📖 Documentation",
+            "labels": [
+                "docs"
+            ]
+        },
+        {
+            "title": "## 🧱 Others",
+            "labels": []
+        }
+    ],
+    "ignore_labels": [
+        "ignore"
+    ],
+    "label_extractor": [
+        {
+            "pattern": "^Fix",
+            "method": "match",
+            "on_property": "title"
+        },
+        {
+            "pattern": "^Feature",
+            "method": "match",
+            "on_property": "title"
+        }
+    ],
+    "tag_resolver": {
+        "method": "semver",
+        "filter": {
+            "pattern": "(ODrive-fw-)(.+)",
+            "method": "replace",
+            "target": "$2",
+            "flags": "gu"
+        },
+        "transformer": {
+            "pattern": "v(.+)",
+            "target": "$1"
+        }
+    },
+    "sort": "DESC",
+    "template": "${{CHANGELOG}}\n\n",
+    "pr_template": "- #{{TITLE}} PR: ##{{NUMBER}} @#{{AUTHOR}}",
+    "empty_template": "- no changes",
+    "max_tags_to_fetch": 500,
+    "max_pull_requests": 100,
+    "max_back_track_time_days": 365
+}
