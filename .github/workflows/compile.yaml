@@ -109,7 +109,7 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: firmwares
           path: Firmware/build/*.hex
           if-no-files-found: error
 
@@ -143,7 +143,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: firmware/*
+        files: firmwares/*
         body: ${{steps.changelog.outputs.changelog}}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +151,7 @@ jobs:
     - name: '🧹 Remove artifacts'
       uses: geekyeggo/delete-artifact@v5
       with:
-        name: firmware
+        name: firmwares
         failOnError: false
 
   #code-checks:
