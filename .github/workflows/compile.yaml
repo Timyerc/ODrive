@@ -16,7 +16,6 @@ jobs:
         os: [ubuntu-latest]
         board_version: [v3.6-56V]
         debug: [true]
-        gcc: ['7-2018-q2', 'latest']
 
         include:
           - {os: ubuntu-latest, board_version: v3.6-56V, debug: false}
@@ -48,10 +47,10 @@ jobs:
 
           sudo apt install python3 python3-yaml python3-jinja2 python3-jsonschema
 
-      - name: Install GNU Arm Embedded Toolchain - ${{ matrix.gcc }}
+      - name: Install GNU Arm Embedded Toolchain - 7-2018-q2
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
-          release: ${{ matrix.gcc }}
+          release: '7-2018-q2'
 
       - name: Install prerequisites (macOS)
         if: startsWith(matrix.os, 'macOS-')
