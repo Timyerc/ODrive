@@ -98,7 +98,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Firmware
           bash -xe ./tup_build.sh
-          python3 merge.py
+          python3 ../tools/odrive/merge.py
 
       - name: Compile (Windows)
         if: startsWith(matrix.os, 'windows-')
