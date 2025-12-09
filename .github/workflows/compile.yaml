@@ -125,6 +125,8 @@ jobs:
 
     - name: '🤌 Download artifacts'
       uses: actions/download-artifact@v6
+      with:
+        path: firmwares
 
     - name: 'Display structure of downloaded files'
       run: ls
@@ -143,7 +145,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: *.hex
+        files: firmwares/*
         body: ${{steps.changelog.outputs.changelog}}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
