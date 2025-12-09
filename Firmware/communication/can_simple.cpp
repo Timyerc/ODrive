@@ -39,9 +39,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     txmsg.id = motorNum;  // heartbeat ID
     txmsg.isExt = true;
 
-    encoder = (*axis->controller_.pos_estimate_circular_src_) * 65536.0f;  // 计算位置
+    encoder = (uint16_t)((*axis->controller_.pos_estimate_circular_src_) * 65536.0f);  // 计算位置
     // Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f + 32768.0f);//计算速度
-    Speed = ((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);  // 计算速度*极对数
+    Speed = (int16_t)((*axis->controller_.vel_estimate_src_) * 60.0f * axis->motor_.config_.pole_pairs);  // 计算速度*极对数
 
     if (txmsg.id == 0x02 || txmsg.id == 0x11) {
         Speed = -Speed;
@@ -132,8 +132,10 @@ void CANSimple::motor0_Overload_Protection(void) {
     }
     m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
     //m0_Iq_Sum = -3.14159;  // 测试数据
-    bool isNegative = m0_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m0_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
+#ifdef ODRIVE_CUR_DEBUG
+    bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
+#endif
+    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f / 1.7f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
@@ -173,8 +175,11 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Iq_Sum += m1_Cur.Iq_Filter[i];
     }
     m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
-    bool isNegative = m1_Iq_Sum < 0;//判断正负
-    int32_t absoluteValue = m1_Iq_Sum * 1000.0f / 1.7f;//毫安/校准系数
+#ifdef ODRIVE_CUR_DEBUG
+    bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
+#endif
+
+    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f / 1.7f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
