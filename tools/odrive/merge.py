@@ -167,6 +167,5 @@ def main():
         print(f"输出文件路径: {brush_motor_output_file}")
         print("操作完成！")
 
-
 if __name__ == "__main__":
     sys.exit(main())
