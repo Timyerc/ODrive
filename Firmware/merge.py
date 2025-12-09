@@ -119,12 +119,14 @@ def main():
     output_file = f"./build/ODrive-fw-v{version}.hex"
     
     # 检查输出文件是否已存在
+    """
     if os.path.exists(output_file):
         overwrite = input(f"文件 {output_file} 已存在，是否覆盖？(y/n): ")
         if overwrite.lower() != 'y':
             print("操作已取消")
             return 0
-    
+    """
+
     # 合并HEX文件
     print(f"开始合并HEX文件...")
     print(f"固件文件: {firmware_file}")
