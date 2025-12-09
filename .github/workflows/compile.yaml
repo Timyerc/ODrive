@@ -2,11 +2,11 @@ name: Tests
 
 on:
   pull_request:
-    branches: [master, devel]
-    tags: ['fw-v*']
+    branches: [main, devel]
+    tags: ['ODrive-fw-v*']
   push:
-    branches: [master, devel]
-    tags: ['fw-v*']
+    branches: [main, devel]
+    tags: ['ODrive-fw-v*']
 
 jobs:
   compile:
@@ -100,6 +100,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Firmware
           bash -xe ./tup_build.sh
+          python3 merge.py
 
       - name: Compile (Windows)
         if: startsWith(matrix.os, 'windows-')

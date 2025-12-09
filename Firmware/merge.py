@@ -4,7 +4,7 @@ ODrive固件拼接脚本
 功能：
 1. 读取ODriveFirmware.hex和MotorPara.hex文件
 2. 从version.c文件中提取版本号
-3. 生成新的HEX文件，命名为ODrive-fw-v{version}.hex
+3. 生成新的HEX文件,t命名为ODrive-fw-v{version}.hex
 """
 
 import re
@@ -20,7 +20,7 @@ def parse_version_from_c_file(file_path):
     const unsigned char fw_version_revision_ = 3;
     const unsigned char fw_version_unreleased_ = 1;
     
-    返回格式：0.5.3.1
+    返回格式:0.5.3.1
     """
     version_major = 0
     version_minor = 0
