@@ -58,7 +58,63 @@
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
+#define USE_CAN_MOTOR
+// #define USE_CAN_BRUSH
+// 驱动轮电机相关
 
+#define CON_CAN_ID_TO_DRIVE            0X0001   //驱动轮电机驱动器ID
+#define LEFT_DRIVE_CAN_ID              0x0002   //左驱动电机ID
+#define RIGHT_DRIVE_CAN_ID             0x0003   //右驱动电机ID
+
+// 滚刷电机相关
+#define CON_CAN_ID_TO_BRUSH            0X0010   //滚刷电机驱动器ID
+#define LEFT_BRUSH_CAN_ID              0x0012   //左滚刷电机ID
+#define RIGHT_BRUSH_CAN_ID             0x0013   //右滚刷电机ID
+
+// send cmd
+#define MOTOR_HALL_CHANGE_AND_SPEED     0x09    //电机的霍尔变化 + 速度
+#define MOTOR_VERSION                   0x0D    //暂时不做处理
+#define MOTOR_LEFT_RIGHT_PHASE          0x0E    //暂时不做处理
+#define MOTOR_LEFT_RIGHT_REVERSE        0x0F    //暂时不做处理
+#define MOTOR_CONNECTION_STATE          0x10    //暂时不做处理
+//send cmd end
+
+// recve cmd
+#define COM_CONFIRM                     0x00    //暂时不做处理
+#define DRIVE_COMMAND0_SPEED            0X01    //轮子转速设置   第二个元素与第三个元素表示左电机速度（0-65535,32768为0速），四五元素表示右电机速度（0-65535,32768为0速）
+#define DRIVE_COMMAND0_MODE             0X03    //驱动器运行模式（此驱动器有速度模式，位置模式，扭矩模式，电压模式；默认不允许改变使用速度模式）
+#define DRIVE_COMMAND0_START_STOP       0X04    //驱动器状态控制 第二个元素是1表示启动（进入速度闭环模式），2表示停止（进入空闲模式）
+#define DRIVE_COMMAND0_INQUIRY          0X05    //轮子在线问询   第二个元素是1表示z左电机 ，2表示右电机
+#define DRIVE_COMMAND0_GET_SPEED        0X06    //轮子转速问询   第二个元素是1表示z左电机 ，2表示右电机
+#define DRIVE_COMMAND0_PHASE_SEQUENCE   0X07    //设置电机相序   第二个元素是1表示z左电机 ，2表示右电机 （暂时不做这个功能）
+#define DRIVE_COMMAND0_MOTOR_REVERSE    0X08    //设置电机转向   第二个元素是1表示z左电机 ，2表示右电机 第三个元素表示转向（0表示正转，1表示反转）
+#define DRIVE_COMMAND0_MOTOR_EXCHANGE   0X09    //暂时不做处理
+#define DRIVE_COMMAND0_AGEING_TEST      0X10    //暂时不做处理
+
+#define DRIVE_COMMAND0_BATTERY_VOLATILE 0X30    //暂时不做处理
+
+#define DRIVE_COMMAND0_GET_VERSION      0XF0    //暂时不做处理
+
+#define DRIVE_COMMAND0_GET_SEQUENCE     0XE1    //暂时不做处理
+#define DRIVE_COMMAND0_GET_REVVERSE     0XE2    //暂时不做处理
+#define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
+
+typedef enum {
+    DRIVE_CLEAR_ERRORS = 0xC0,                //电机错误状态清除
+    DRIVE__SET_CURRENT_THRESHOLD = 0xCA,      //设置电机过载电流阈值
+    DRIVE__GET_CURRENT_THRESHOLD = 0xCB,      //获取电机过载电流阈值
+    // DRIVE_MOTOR_CALIBRATION = 0xCC,           //电机校准
+    // DRIVE_ENCODER_OFFSET_CALIBRATION = 0xCD,  //编码器校准
+    // DRIVE_CLOSED_LOOP_CONTROL = 0xCE,         //进入闭环模式
+    // DRIVE_IDLE_MODE = 0xCF,                   //进入空闲模式
+    DRIVE_RESTART = 0xCF,                     //重新启动
+} DRIVE_CMD_ENUM;
+// #define DRIVE_CLEAR_ERRORS                0xC0  //电机错误状态清除
+// #define DRIVE_MOTOR_CALIBRATION           0xCC  //电机校准
+// #define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCD  //编码器校准
+// #define DRIVE_CLOSED_LOOP_CONTROL         0xCE  //进入闭环模式
+// #define DRIVE_IDLE_MODE                   0xCF  //进入空闲模式
+// recve cmd end
 /* USER CODE END Includes */
 
 extern CAN_HandleTypeDef hcan1;

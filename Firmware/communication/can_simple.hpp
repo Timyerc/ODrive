@@ -33,11 +33,24 @@ class CANSimple {
         MSG_CLEAR_ERRORS,
         MSG_CO_HEARTBEAT_CMD = 0x700,  // CANOpen NMT Heartbeat  SEND
     };
-
+    static uint32_t alive;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
-
+    static void keepAlive(Axis* axis);
    private:
+
+
+    // ovo-new
+    static uint8_t readDate8(const can_Message_t& msg, uint8_t index);
+    static uint16_t readDate16(const can_Message_t& msg, uint8_t index);
+    static uint32_t readDate32(const can_Message_t& msg, uint8_t index);
+    static bool sendMotorSpeed(Axis* axis,uint32_t motorNum);
+    static void motor0_Overload_Protection(void);
+    static void motor1_Overload_Protection(void);
+    static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
+    static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);
+    static void motor_current_fault(void);
+
     static void nmt_callback(Axis* axis, can_Message_t& msg);
     static void estop_callback(Axis* axis, can_Message_t& msg);
     static void get_motor_error_callback(Axis* axis, can_Message_t& msg);
@@ -78,7 +91,12 @@ class CANSimple {
 };
 
 
-
+typedef struct canMessage_s{
+    uint8_t cmd;
+    uint16_t leftSpeed;
+    uint16_t rightSpeed;
+    uint8_t SpeedRequst;
+} canMessage_t;
 
 
 #endif

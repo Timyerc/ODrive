@@ -56,7 +56,8 @@ public:
         uint32_t can_node_id = 0; // Both axes will have the same id to start
         bool can_node_id_extended = false;
         uint32_t can_heartbeat_rate_ms = 100;
-
+        uint16_t heartbeat_rate_ms = 30;    // 100ms units
+        uint16_t current_threshold_mA = 4000; // Current threshold for M0 message in mA
         // custom setters
         Axis* parent = nullptr;
         void set_step_gpio_pin(uint16_t value) { step_gpio_pin = value; parent->decode_step_dir_pins(); }

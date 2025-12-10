@@ -134,6 +134,12 @@ bool ODriveCAN::read(can_Message_t &rxmsg) {
 // Conveniently, the CAN peripheral's 42MHz clock lets us easily create 21TQs for all common baud rates
 void ODriveCAN::set_baud_rate(uint32_t baudRate) {
     switch (baudRate) {
+
+        case CAN_BAUD_100K:  // 添加100k波特率配置
+            handle_->Init.Prescaler = 20;  // 根据APB时钟计算得出
+            config_.baud_rate = baudRate;
+            reinit_can();
+            break;
         case CAN_BAUD_125K:
             handle_->Init.Prescaler = 16;  // 21 TQ's
             config_.baud_rate = baudRate;
@@ -184,7 +190,8 @@ void ODriveCAN::send_heartbeat(Axis *axis) {
         if ((now - axis->last_heartbeat_) >= axis->config_.can_heartbeat_rate_ms) {
             switch (config_.protocol) {
                 case PROTOCOL_SIMPLE:
-                    CANSimple::send_heartbeat(axis);
+                    //CANSimple::send_heartbeat(axis);
+                    CANSimple::keepAlive(axis);
                     break;
             }
             axis->last_heartbeat_ = now;

@@ -4,6 +4,26 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+            {
+            "name": "Jlink_Debug",
+            "cwd": "${workspaceFolder}",           
+            //"executable": "Firmware\\build\\ODriveFirmware.elf", 
+            "executable": "${workspaceRoot}/build/ODriveFirmware.elf",    
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "jlink",
+            "interface": "swd",
+            "device": "STM32F405RG",
+            "toolchainPrefix": "arm-none-eabi",
+            "serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
+            "gdbPath": "D:\\OdrivePATH\\arm-gnu-toolchain-14.3.rel1-mingw-w64-i686-arm-none-eabi\\bin\\arm-none-eabi-gdb.exe",
+            //"svdFile": "C:\\Keil_v5\\ARM\\PACK\\Keil\\LCM32F0xx_DFP\\0.4.71\\SVD\\LCM32F067.svd",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
         {
             // For the Cortex-Debug extension
             "type": "cortex-debug",

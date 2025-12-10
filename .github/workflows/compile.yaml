@@ -2,48 +2,38 @@ name: Tests
 
 on:
   pull_request:
-    branches: [master, devel]
-    tags: ['fw-v*']
+    branches: [main, devel]
+
   push:
-    branches: [master, devel]
-    tags: ['fw-v*']
+    branches: [main, devel]
+    tags: ['ODrive-fw-v*']
 
 jobs:
   compile:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-16.04, ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest]
         board_version: [v3.6-56V]
-        debug: [true]
-
-        include:
-          - {os: ubuntu-latest, board_version: v3.2, debug: false}
-          - {os: ubuntu-latest, board_version: v3.3, debug: false}
-          - {os: ubuntu-latest, board_version: v3.4-24V, debug: false}
-          - {os: ubuntu-latest, board_version: v3.4-48V, debug: false}
-          - {os: ubuntu-latest, board_version: v3.5-24V, debug: false}
-          - {os: ubuntu-latest, board_version: v3.5-48V, debug: false}
-          - {os: ubuntu-latest, board_version: v3.6-24V, debug: false}
-          - {os: ubuntu-latest, board_version: v3.6-56V, debug: false}
+        debug: [false]
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - name: Install prerequisites (Debian)
         if: startsWith(matrix.os, 'ubuntu-')
         run: |
           DEBIAN_VERSION="$(lsb_release --release --short)"
           echo Debian version: $DEBIAN_VERSION
-          if [ "$DEBIAN_VERSION" -gt 9 ]; then
-            sudo apt-get install gcc-arm-none-eabi
-          else
-            # Ubuntu 16.04 (Debian 9) is on ARM GCC 4.9 which is too old for us
-            sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
-            sudo apt-get update
-            sudo apt-get install gcc-arm-embedded
-          fi
+          # if [ "$DEBIAN_VERSION" -gt 9 ]; then
+          #   sudo apt-get install gcc-arm-none-eabi
+          # else
+          #   # Ubuntu 16.04 (Debian 9) is on ARM GCC 4.9 which is too old for us
+          #   sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
+          #   sudo apt-get update
+          #   sudo apt-get install gcc-arm-embedded
+          # fi
 
           if ! (apt-cache search tup | grep "^tup - "); then
             sudo add-apt-repository ppa:jonathonf/tup
@@ -54,6 +44,11 @@ jobs:
 
           sudo apt install python3 python3-yaml python3-jinja2 python3-jsonschema
 
+      - name: Install GNU Arm Embedded Toolchain - 7-2018-q2
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '7-2018-q2'
+
       - name: Install prerequisites (macOS)
         if: startsWith(matrix.os, 'macOS-')
         run: |
@@ -63,7 +58,7 @@ jobs:
 
         
       - name: Cache chocolatey
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         if: startsWith(matrix.os, 'windows-')
         with:
           path: C:\Users\runneradmin\AppData\Local\Temp\chocolatey\gcc-arm-embedded
@@ -100,6 +95,8 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Firmware
           bash -xe ./tup_build.sh
+          cd ../tools/odrive
+          python3 merge.py
 
       - name: Compile (Windows)
         if: startsWith(matrix.os, 'windows-')
@@ -107,6 +104,57 @@ jobs:
           cd ${{ github.workspace }}/Firmware
           mv tup_build.sh tup_build.bat # in reality this is a .bat script on windows
           .\tup_build.bat
+
+      - name: '⬆ Upload artifacts'
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmwares
+          path: Firmware/build/*.hex
+          if-no-files-found: error
+
+  stable-release:
+    needs: compile
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+    - name: '⏳ Checkout repository'
+      uses: actions/checkout@v4
+      with:
+        submodules: false
+
+    - name: '🤌 Download artifacts'
+      uses: actions/download-artifact@v6
+      with:
+        path: firmwares
+
+    - name: 'Display structure of downloaded files'
+      run: ls
+
+    - name: "✏️ Generate release changelog"
+      id: changelog
+      if: ${{ startsWith(github.ref, 'refs/tags/ODrive-fw-v') }}
+      uses: mikepenz/release-changelog-builder-action@v4
+      with:
+        configuration: '.github/workflows/changelog.json'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: '🔥 Create stable release'
+      if: ${{ startsWith(github.ref, 'refs/tags/ODrive-fw-v') }}
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        files: firmwares/*
+        body: ${{steps.changelog.outputs.changelog}}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: '🧹 Remove artifacts'
+      uses: geekyeggo/delete-artifact@v5
+      with:
+        name: firmwares
+        failOnError: false
 
   #code-checks:
   #  runs-on: ubuntu-latest
