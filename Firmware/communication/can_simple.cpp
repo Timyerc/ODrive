@@ -238,6 +238,7 @@ void CANSimple::keepAlive(Axis* axis) {
     odCAN->write(txmsg);
 #endif
 }
+
 // 获取电机电流阈值
 void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
 {
@@ -275,6 +276,34 @@ void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id,uin
         axes[1]->config_.current_threshold_mA = current_mA;
     }
     get_motor_current_threshold(motorNum, msg_id);//返回设置结果
+    odrv.save_configuration();
+    odrv.reboot();
+}
+
+// 获取电机最大速度限制
+void CANSimple::get_motor_max_speed_limit(uint8_t msg_id)
+{
+    can_Message_t txmsg;
+    txmsg.id = 0x01;
+    txmsg.isExt = true;
+    txmsg.len = 5;
+
+    txmsg.buf[0] = msg_id;
+    txmsg.buf[1] = axes[0]->config_.max_speed_limit >> 8;
+    txmsg.buf[2] = axes[0]->config_.max_speed_limit;
+    txmsg.buf[3] = axes[1]->config_.max_speed_limit >> 8;
+    txmsg.buf[4] = axes[1]->config_.max_speed_limit;
+
+    odCAN->write(txmsg);
+}
+
+// 设置电机最大速度限制
+void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed ,uint16_t m1_max_speed)
+{
+    axes[0]->config_.max_speed_limit = m0_max_speed;
+    axes[1]->config_.max_speed_limit = m1_max_speed;
+
+    get_motor_max_speed_limit(msg_id);//返回设置结果
     odrv.save_configuration();
     odrv.reboot();
 }
@@ -326,6 +355,12 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         break;
     case DRIVE__GET_CURRENT_THRESHOLD:  // 获取电机电流阈值
         get_motor_current_threshold(readDate8(msg, 8),DRIVE__GET_CURRENT_THRESHOLD);
+        break;
+    case DRIVE__SET_MAX_SPEED_LIMIT:  // 设置电机最大速度限制
+        set_motor_max_speed_limit(DRIVE__SET_MAX_SPEED_LIMIT,readDate16(msg, 8),readDate16(msg, 24));
+        break;
+    case DRIVE__GET_MAX_SPEED_LIMIT:  // 获取电机最大速度限制
+        get_motor_max_speed_limit(DRIVE__GET_MAX_SPEED_LIMIT);
         break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
         if(!readDate16(msg, 16)){
