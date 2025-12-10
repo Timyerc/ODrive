@@ -1,4 +1,6 @@
-擦除数据
+版本号：V0.5.3
+日期：  2025.12.10
+#擦除数据
 odrv0.erase_configuration()
 
 #基本配置：
@@ -11,18 +13,18 @@ odrv0.config.max_regen_current = 0
 
 #M0电机参数
 odrv0.axis0.motor.config.pole_pairs = 4
-odrv0.axis0.motor.config.calibration_current = 6
-odrv0.axis0.motor.config.resistance_calib_max_voltage = 12
+odrv0.axis0.motor.config.calibration_current = 4
+odrv0.axis0.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis0.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
-odrv0.axis0.motor.config.current_control_bandwidth = 20
+odrv0.axis0.motor.config.current_control_bandwidth = 100
 odrv0.axis0.motor.config.current_lim = 8
 odrv0.axis0.motor.config.requested_current_range = 15
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 4
-odrv0.axis1.motor.config.calibration_current = 6
-odrv0.axis1.motor.config.resistance_calib_max_voltage = 12
+odrv0.axis1.motor.config.calibration_current = 4
+odrv0.axis1.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis1.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
-odrv0.axis1.motor.config.current_control_bandwidth = 20
+odrv0.axis1.motor.config.current_control_bandwidth = 100
 odrv0.axis1.motor.config.current_lim = 8
 odrv0.axis1.motor.config.requested_current_range = 15
 
@@ -39,16 +41,16 @@ odrv0.axis1.encoder.config.bandwidth = 100
 odrv0.axis0.controller.config.control_mode = CONTROL_MODE_VELOCITY_CONTROL
 odrv0.axis0.controller.config.vel_limit = 51
 odrv0.axis0.controller.config.pos_gain = 0
-odrv0.axis0.controller.config.vel_gain = 1
-odrv0.axis0.controller.config.vel_integrator_gain = 0.005
+odrv0.axis0.controller.config.vel_gain = 0.005
+odrv0.axis0.controller.config.vel_integrator_gain = 0.001
 odrv0.axis0.controller.config.input_mode = INPUT_MODE_VEL_RAMP#INPUT_MODE_PASSTHROUGH
 odrv0.axis0.controller.config.vel_ramp_rate = 40
 #M1控制器配置，速度闭环
 odrv0.axis1.controller.config.control_mode = CONTROL_MODE_VELOCITY_CONTROL 
 odrv0.axis1.controller.config.vel_limit = 51
 odrv0.axis1.controller.config.pos_gain = 0
-odrv0.axis1.controller.config.vel_gain = 1
-odrv0.axis1.controller.config.vel_integrator_gain = 0.005
+odrv0.axis1.controller.config.vel_gain = 0.005
+odrv0.axis1.controller.config.vel_integrator_gain = 0.001
 odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP#INPUT_MODE_PASSTHROUGH
 odrv0.axis1.controller.config.vel_ramp_rate = 40
 #使用ODrivetool配置Can
@@ -63,6 +65,8 @@ odrv0.axis0.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE
 
 odrv0.axis0.requested_state=AXIS_STATE_CLOSED_LOOP_CONTROL#进入闭环模式
 
+#odrv0.axis0.requested_state=AXIS_STATE_SENSORLESS_CONTROL#进入无传感器模式
+#odrv0.axis0.config.startup_sensorless_control = True	#开机进入无传感器模式
 odrv0.axis0.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis0.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis0.config.startup_closed_loop_control=True#开机进入闭环
@@ -103,6 +107,26 @@ odrv0.axis1.encoder.error = 0#清除编码器错误
 odrv0.axis1.encoder.vel_estimate  
 
 start_liveplotter(lambda:[])
+start_liveplotter(lambda:[odrv0.axis0.encoder.vel_estimate])
+
+
+odrv0.axis0.controller.input_vel = 10
+
+
+odrv0.axis0.controller.config.vel_gain = 0.005
+odrv0.axis0.controller.config.vel_integrator_gain = 0.001
 
 odrv0.axis0.encoder.vel_estimate
 odrv0.axis1.encoder.vel_estimate
+
+
+odrv0.axis0.motor.DC_calib_phB
+odrv0.axis1.motor.DC_calib_phB
+odrv0.axis0.motor.DC_calib_phC
+odrv0.axis1.motor.DC_calib_phC
+
+
+odrv0.axis0.motor.config.phase_resistance
+odrv0.axis1.motor.config.phase_resistance
+odrv0.axis0.motor.config.phase_inductance
+odrv0.axis1.motor.config.phase_inductance
