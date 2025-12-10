@@ -4,6 +4,12 @@
 #include <odrive_main.h>
 
 #include <cstring>
+
+//#define ODRIVE_CUR_DEBUG
+#define FILTER_DEPTH 30 // 滤波深度
+
+
+
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
@@ -95,8 +101,6 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
-//#define ODRIVE_CUR_DEBUG
-#define FILTER_DEPTH 30 // 滤波深度
 
 typedef struct
 {
