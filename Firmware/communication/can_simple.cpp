@@ -1,20 +1,19 @@
-
 #include "can_simple.hpp"
-
 #include <odrive_main.h>
-
 #include <cstring>
 
-//#define ODRIVE_CUR_DEBUG
-#define FILTER_DEPTH 30 // 滤波深度
+#define USE_USER_CAN_CALLBACKS // 使用自定义CAN回调函数
+//#define ODRIVE_CUR_DEBUG  // 开启电流调试功能
+#define FILTER_DEPTH 30     // 滤波深度
+//#define ODRIVE_CAN_TEST   // 开启CAN测试功能
 
-
+// 定义静态成员变量
+uint32_t CANSimple::alive = 0;
 
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
-#define USE_USER_CAN_CALLBACKS 1
-#if USE_USER_CAN_CALLBACKS
+#ifdef  USE_USER_CAN_CALLBACKS
 uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index) {
     uint8_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true);
@@ -101,7 +100,6 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     return true;
 }
 
-
 typedef struct
 {
     uint8_t Countdown;//倒计时
@@ -126,7 +124,7 @@ void CANSimple::motor_current_fault(void) {
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
     //平滑滤波
-    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Iq_measured;
+    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Ibus;
     m0_Cur.Iq_Num++;
     if (m0_Cur.Iq_Num >= FILTER_DEPTH)
         m0_Cur.Iq_Num = 0;
@@ -139,7 +137,7 @@ void CANSimple::motor0_Overload_Protection(void) {
 #ifdef ODRIVE_CUR_DEBUG
     bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
 #endif
-    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f / 1.7f);//毫安/校准系数
+    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f / 0.95f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
@@ -171,7 +169,7 @@ void CANSimple::motor0_Overload_Protection(void) {
 //过载保护，100ms检测一次电流数据
 void CANSimple::motor1_Overload_Protection(void) {
     //平滑滤波
-    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Iq_measured;
+    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Ibus;
     m1_Cur.Iq_Num++;
     if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
     float m1_Iq_Sum = 0;
@@ -183,7 +181,7 @@ void CANSimple::motor1_Overload_Protection(void) {
     bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
 #endif
 
-    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f / 1.7f);//毫安/校准系数
+    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f / 0.95f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
@@ -212,10 +210,7 @@ void CANSimple::motor1_Overload_Protection(void) {
     odCAN->write(txmsg);
 #endif
 }
-//#define ODRIVE_CAN_TEST
 
-// 定义静态成员变量
-uint32_t CANSimple::alive = 0;
 // 保活任务
 void CANSimple::keepAlive(Axis* axis) {
     alive++;
@@ -224,8 +219,8 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    // motor0_Overload_Protection();
-    // motor1_Overload_Protection();
+    motor0_Overload_Protection();
+    motor1_Overload_Protection();
 
 #ifdef ODRIVE_CAN_TEST
     can_Message_t txmsg;
@@ -343,22 +338,6 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
         }
         break;
-    // case DRIVE_MOTOR_CALIBRATION:  // 电机自检
-    //     axes[0]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
-    //     axes[1]->requested_state_ = Axis::AXIS_STATE_MOTOR_CALIBRATION;
-    //     break;
-    // case DRIVE_ENCODER_OFFSET_CALIBRATION:  // 编码器校准
-    //     axes[0]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-    //     axes[1]->requested_state_ = Axis::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-    //     break;
-    // case DRIVE_CLOSED_LOOP_CONTROL:  // 进入闭环模式
-    //     axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-    //     axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-    //     break;
-    // case DRIVE_IDLE_MODE:  // 空闲模式
-    //     axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;
-    //     axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;
-    //     break;
     case DRIVE_RESTART:  // 重新启动
         odrv.reboot();
         break;

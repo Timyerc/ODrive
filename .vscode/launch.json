@@ -23,5 +23,39 @@
                 "samplesPerSecond": 4
             }
         },
+        {
+            "name": "Download_RunMotorPara",
+            "cwd": "${workspaceFolder}",           
+            //"executable": "txt\\光伏驱动轮\\RunMotorPara.hex",
+            "executable": "Firmware\\build\\Run_ODrive-fw-v0.5.3.hex",   
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "jlink",
+            "interface": "swd",
+            "device": "STM32F405RG",
+            "toolchainPrefix": "arm-none-eabi",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
+        {
+            "name": "Download_BrushMotorPara",
+            "cwd": "${workspaceFolder}",           
+            "executable": "txt\\光伏滚刷\\BrushMotorPara.hex",   
+            "request": "launch",
+            "type": "cortex-debug",
+            "runToEntryPoint": "main",
+            "servertype": "jlink",
+            "interface": "swd",
+            "device": "STM32F405RG",
+            "toolchainPrefix": "arm-none-eabi",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
+
     ]
 }
