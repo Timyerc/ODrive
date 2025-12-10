@@ -416,7 +416,7 @@ bool Axis::run_homing() {
         if (!motor_.update(torque_setpoint, encoder_.phase_, phase_vel))
             return false; // set_error should update axis.error_
 
-        return !min_endstop_.get_state();
+        return !min_endstop_.get_state();     
     });
     error_ &= ~ERROR_MIN_ENDSTOP_PRESSED; // clear this error since we deliberately drove into the endstop
 
