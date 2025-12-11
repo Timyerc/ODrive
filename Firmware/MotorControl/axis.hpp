@@ -58,6 +58,11 @@ public:
         uint32_t can_heartbeat_rate_ms = 100;
         uint16_t heartbeat_rate_ms = 30;    // 100ms units
         uint16_t current_threshold_mA = 4000; // Current threshold for M0 message in mA
+        uint16_t max_speed_limit = 50;// [turns/s], for step/dir input
+        uint16_t template_para1 = 0;
+        uint16_t template_para2 = 0;
+        uint16_t template_para3 = 0;
+        uint16_t template_para4 = 0; // reserved for future use
         // custom setters
         Axis* parent = nullptr;
         void set_step_gpio_pin(uint16_t value) { step_gpio_pin = value; parent->decode_step_dir_pins(); }
