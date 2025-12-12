@@ -26,8 +26,7 @@
         {
             "name": "Download_RunMotorPara",
             "cwd": "${workspaceFolder}",           
-            //"executable": "txt\\光伏驱动轮\\RunMotorPara.hex",
-            "executable": "Firmware\\build\\Run_ODrive-fw-v0.5.3.hex",   
+            "executable": "Firmware\\build\\Run-ODrive-fw-v0.5.3.hex",   
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
@@ -43,7 +42,7 @@
         {
             "name": "Download_BrushMotorPara",
             "cwd": "${workspaceFolder}",           
-            "executable": "txt\\光伏滚刷\\BrushMotorPara.hex",   
+            "executable": "Firmware\\build\\Brush-ODrive-fw-v0.5.3.hex", 
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
