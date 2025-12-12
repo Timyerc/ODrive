@@ -22,39 +22,6 @@
                 "enabled": true,
                 "samplesPerSecond": 4
             }
-        },
-        {
-            "name": "Download_RunMotorPara",
-            "cwd": "${workspaceFolder}",           
-            "executable": "Firmware\\build\\Run-ODrive-fw-v0.5.3.hex",   
-            "request": "launch",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "servertype": "jlink",
-            "interface": "swd",
-            "device": "STM32F405RG",
-            "toolchainPrefix": "arm-none-eabi",
-            "liveWatch": {
-                "enabled": true,
-                "samplesPerSecond": 4
-            }
-        },
-        {
-            "name": "Download_BrushMotorPara",
-            "cwd": "${workspaceFolder}",           
-            "executable": "Firmware\\build\\Brush-ODrive-fw-v0.5.3.hex", 
-            "request": "launch",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "servertype": "jlink",
-            "interface": "swd",
-            "device": "STM32F405RG",
-            "toolchainPrefix": "arm-none-eabi",
-            "liveWatch": {
-                "enabled": true,
-                "samplesPerSecond": 4
-            }
-        },
-
+        }
     ]
 }

@@ -53,6 +53,7 @@ odrv0.axis1.controller.config.vel_gain = 0.005
 odrv0.axis1.controller.config.vel_integrator_gain = 0.001
 odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP#INPUT_MODE_PASSTHROUGH
 odrv0.axis1.controller.config.vel_ramp_rate = 40
+
 #使用ODrivetool配置Can
 odrv0.axis0.config.can_node_id = 0x010
 odrv0.axis1.config.can_node_id = 0x010
@@ -62,8 +63,6 @@ odrv0.reboot()
 
 #M0电机和编码器校准：
 odrv0.axis0.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE
-
-odrv0.axis0.requested_state=AXIS_STATE_CLOSED_LOOP_CONTROL#进入闭环模式
 
 #odrv0.axis0.requested_state=AXIS_STATE_SENSORLESS_CONTROL#进入无传感器模式
 #odrv0.axis0.config.startup_sensorless_control = True	#开机进入无传感器模式
@@ -79,8 +78,6 @@ odrv0.reboot()
 #M1电机和编码器校准：
 odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE
 
-odrv0.axis1.requested_state=AXIS_STATE_CLOSED_LOOP_CONTROL#进入闭环模式
-
 odrv0.axis1.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis1.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis1.config.startup_closed_loop_control=True#开机进入闭环
@@ -90,7 +87,8 @@ odrv0.axis1.encoder.config.ignore_illegal_hall_state = True
 odrv0.save_configuration()
 odrv0.reboot()
 
-
+odrv0.axis0.requested_state=AXIS_STATE_CLOSED_LOOP_CONTROL#进入闭环模式
+odrv0.axis1.requested_state=AXIS_STATE_CLOSED_LOOP_CONTROL#进入闭环模式
 
 
 #查看错误
@@ -105,11 +103,10 @@ odrv0.axis1.motor.error=0#清除电机错误
 odrv0.axis1.encoder.error = 0#清除编码器错误
 
 
-
 odrv0.axis1.encoder.vel_estimate  
 
 start_liveplotter(lambda:[])
-start_liveplotter(lambda:[odrv0.axis0.encoder.vel_estimate])
+start_liveplotter(lambda:[odrv0.axis0.motor.current_control.Ibus])
 
 
 odrv0.axis0.controller.input_vel = 10
