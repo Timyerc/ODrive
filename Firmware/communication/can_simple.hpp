@@ -49,6 +49,8 @@ class CANSimple {
     static void motor1_Overload_Protection(void);
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
     static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);
+    static void get_motor_max_speed_limit(uint8_t msg_id);
+    static void set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed ,uint16_t m1_max_speed);
     static void motor_current_fault(void);
 
     static void nmt_callback(Axis* axis, can_Message_t& msg);
