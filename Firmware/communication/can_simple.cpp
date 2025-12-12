@@ -56,38 +56,38 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
-        txmsg.buf[1] = axis->motor_.error_;
-        txmsg.buf[2] = axis->motor_.error_ >> 8;
-        txmsg.buf[3] = axis->motor_.error_ >> 16;
-        txmsg.buf[4] = axis->motor_.error_ >> 24;
+        txmsg.buf[1] = axis->motor_.error_ >> 24;
+        txmsg.buf[2] = axis->motor_.error_ >> 16;
+        txmsg.buf[3] = axis->motor_.error_ >> 8;
+        txmsg.buf[4] = axis->motor_.error_ ;
     } else if (axis->encoder_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x05;  // 霍尔故障
-        txmsg.buf[1] = axis->encoder_.error_;
-        txmsg.buf[2] = axis->encoder_.error_ >> 8;
-        txmsg.buf[3] = axis->encoder_.error_ >> 16;
-        txmsg.buf[4] = axis->encoder_.error_ >> 24;
+        txmsg.buf[1] = axis->encoder_.error_ >> 24;
+        txmsg.buf[2] = axis->encoder_.error_ >> 16;
+        txmsg.buf[3] = axis->encoder_.error_ >> 8;
+        txmsg.buf[4] = axis->encoder_.error_ ;
     } else if (axis->sensorless_estimator_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x03;  // 电机过流
-        txmsg.buf[1] = axis->sensorless_estimator_.error_;
-        txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 8;
-        txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 16;
-        txmsg.buf[4] = axis->sensorless_estimator_.error_ >> 24;
+        txmsg.buf[1] = axis->sensorless_estimator_.error_ >> 24;
+        txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 16;
+        txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 8;
+        txmsg.buf[4] = axis->sensorless_estimator_.error_ ;
     } else if (axis->controller_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x01;  // 
-        txmsg.buf[1] = axis->controller_.error_;
-        txmsg.buf[2] = axis->controller_.error_ >> 8;
-        txmsg.buf[3] = axis->controller_.error_ >> 16;
-        txmsg.buf[4] = axis->controller_.error_ >> 24;
+        txmsg.buf[1] = axis->controller_.error_ >> 24;
+        txmsg.buf[2] = axis->controller_.error_ >> 16;
+        txmsg.buf[3] = axis->controller_.error_ >> 8;
+        txmsg.buf[4] = axis->controller_.error_ ;
     } else if (axis->error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x02;  // 
-        txmsg.buf[1] = axis->error_;
-        txmsg.buf[2] = axis->error_ >> 8;
-        txmsg.buf[3] = axis->error_ >> 16;
-        txmsg.buf[4] = axis->error_ >> 24;
+        txmsg.buf[1] = axis->error_ >> 24;
+        txmsg.buf[2] = axis->error_ >> 16;
+        txmsg.buf[3] = axis->error_ >> 8;
+        txmsg.buf[4] = axis->error_ ;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
