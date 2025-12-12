@@ -262,6 +262,7 @@ void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
     }
     odCAN->write(txmsg);
 }
+
 // 设置电机电流阈值
 void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id,uint16_t rate_ms, uint16_t current_mA)
 {
