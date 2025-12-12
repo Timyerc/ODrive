@@ -2,10 +2,10 @@
 #include <odrive_main.h>
 #include <cstring>
 
-#define USE_USER_CAN_CALLBACKS // 使用自定义CAN回调函数
-//#define ODRIVE_CUR_DEBUG  // 开启电流调试功能
-#define FILTER_DEPTH 30     // 滤波深度
-//#define ODRIVE_CAN_TEST   // 开启CAN测试功能
+#define USE_USER_CAN_CALLBACKS  1   // 使用自定义CAN回调函数
+#define ODRIVE_CUR_DEBUG        0   // 开启电流调试功能
+#define FILTER_DEPTH            30  // 滤波深度
+#define ODRIVE_CAN_TEST         0   // CAN测试功能开关
 
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
@@ -13,7 +13,7 @@ uint32_t CANSimple::alive = 0;
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
-#ifdef  USE_USER_CAN_CALLBACKS
+#if USE_USER_CAN_CALLBACKS
 uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index) {
     uint8_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true);
@@ -134,10 +134,10 @@ void CANSimple::motor0_Overload_Protection(void) {
     }
     m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
     //m0_Iq_Sum = -3.14159;  // 测试数据
-#ifdef ODRIVE_CUR_DEBUG
-    bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
+#if ODRIVE_CUR_DEBUG
+    bool isNegative = (bool)(m0_Iq_Sum < 0);//判断正负
 #endif
-    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f / 0.95f);//毫安/校准系数
+    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f * 1.2f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
@@ -148,9 +148,9 @@ void CANSimple::motor0_Overload_Protection(void) {
     else {
         m0_Cur.Countdown = 0;
     }
-#ifdef ODRIVE_CUR_DEBUG
+#if ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = axes[0]->config_.can_node_id + 3;
+    txmsg.id = axes[0]->config_.can_node_id + 4;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -177,11 +177,11 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Iq_Sum += m1_Cur.Iq_Filter[i];
     }
     m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
-#ifdef ODRIVE_CUR_DEBUG
+#if ODRIVE_CUR_DEBUG
     bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
 #endif
 
-    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f / 0.95f);//毫安/校准系数
+    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f * 1.2f);//毫安/校准系数
     absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
     if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
@@ -193,9 +193,9 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Cur.Countdown = 0;
     }
 
-#ifdef ODRIVE_CUR_DEBUG
+#if ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = axes[1]->config_.can_node_id + 4;
+    txmsg.id = axes[1]->config_.can_node_id + 5;
     txmsg.isExt = true;
     txmsg.len = 8;
     // 使用除法和模运算提取各位
@@ -222,7 +222,7 @@ void CANSimple::keepAlive(Axis* axis) {
     motor0_Overload_Protection();
     motor1_Overload_Protection();
 
-#ifdef ODRIVE_CAN_TEST
+#if ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
     txmsg.id += MSG_ODRIVE_HEARTBEAT;  // heartbeat ID
@@ -230,10 +230,10 @@ void CANSimple::keepAlive(Axis* axis) {
     txmsg.len = 8;
 
     // Axis errors in 1st 32-bit value
-    txmsg.buf[0] = alive;
-    txmsg.buf[1] = alive >> 8;
-    txmsg.buf[2] = alive >> 16;
-    txmsg.buf[3] = alive >> 24;
+    txmsg.buf[0] = alive >> 24;
+    txmsg.buf[1] = alive >> 16;
+    txmsg.buf[2] = alive >> 8;
+    txmsg.buf[3] = alive ;
     odCAN->write(txmsg);
 #endif
 }
@@ -308,7 +308,7 @@ void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed 
 }
 
 void CANSimple::handle_can_message(can_Message_t& msg) {
-#ifdef ODRIVE_CAN_TEST
+#if ODRIVE_CAN_TEST
     odCAN->write(msg);//返回接收到的数据
 #endif
 
