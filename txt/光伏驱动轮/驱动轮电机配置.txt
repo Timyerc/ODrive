@@ -72,12 +72,14 @@ odrv0.axis0.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis0.config.startup_closed_loop_control=True#开机进入闭环
 odrv0.axis0.requested_state=AXIS_STATE_IDLE
 #odrv0.axis0.config.startup_encoder_offset_calibration =True#开机自检编码器，开机后自转
+odrv0.axis0.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
 
 odrv0.axis1.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis1.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis1.config.startup_closed_loop_control=True#开机进入闭环
 odrv0.axis1.requested_state=AXIS_STATE_IDLE
 #odrv0.axis1.config.startup_encoder_offset_calibration =True#开机自检编码器，开机后自转
+odrv0.axis0.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
 odrv0.save_configuration()
 odrv0.reboot()
 
