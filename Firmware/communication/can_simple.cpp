@@ -9,6 +9,7 @@
 
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
+uint32_t CANSimple::error_ = 0;
 
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
@@ -53,7 +54,14 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     }
 
     // 状态码
-    if (axis->motor_.error_) {
+    if(error_){
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x04;  // 自定义故障
+        txmsg.buf[1] = error_ >> 24;
+        txmsg.buf[2] = error_ >> 16;
+        txmsg.buf[3] = error_ >> 8;
+        txmsg.buf[4] = error_ ;
+    } else if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
         txmsg.buf[1] = axis->motor_.error_ >> 24;
@@ -113,26 +121,36 @@ extern ODriveCAN::Config_t can_config;
 
 // 电流过载故障处理
 void CANSimple::motor_current_fault(void) {
-    for (size_t i = 0; i < AXIS_COUNT; ++i) {
-        safety_critical_disarm_motor_pwm(axes[i]->motor_);// 关闭PWM输出
-        axes[i]->controller_.input_vel_ = 0;//速度清零
-        axes[i]->motor_.current_control_.Iq_measured = 0.0f;//测量电流清零
-        axes[i]->motor_.error_ |= Motor::ERROR_DC_BUS_OVER_CURRENT;// 设置过流错误标志
-    }
+    // for (size_t i = 0; i < AXIS_COUNT; ++i) {
+    //     safety_critical_disarm_motor_pwm(axes[i]->motor_);// 关闭PWM输出
+    //     axes[i]->controller_.input_vel_ = 0;// 速度清零
+    //     axes[i]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
+    //     axes[i]->motor_.error_ |= Motor::ERROR_DC_BUS_OVER_CURRENT;// 设置过流错误标志
+    // }
+
+    axes[0]->controller_.input_vel_ = 0;// 速度清零
+    axes[0]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
+    axes[1]->controller_.input_vel_ = 0;// 速度清零
+    axes[1]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
+    safety_critical_disarm_motor_pwm(axes[0]->motor_);// 关闭PWM输出
+    safety_critical_disarm_motor_pwm(axes[1]->motor_);// 关闭PWM输出
 }
 
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
-    //平滑滤波
-    m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Ibus;
-    m0_Cur.Iq_Num++;
-    if (m0_Cur.Iq_Num >= FILTER_DEPTH)
-        m0_Cur.Iq_Num = 0;
     float m0_Iq_Sum = 0;
-    for(uint8_t i=0; i<FILTER_DEPTH; i++) {
-        m0_Iq_Sum += m0_Cur.Iq_Filter[i];
-    }
-    m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
+    //平滑滤波
+    // m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Ibus;
+    // m0_Cur.Iq_Num++;
+    // if (m0_Cur.Iq_Num >= FILTER_DEPTH)
+    //     m0_Cur.Iq_Num = 0;
+
+    // for(uint8_t i=0; i<FILTER_DEPTH; i++) {
+    //     m0_Iq_Sum += m0_Cur.Iq_Filter[i];
+    // }
+    // m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
+
+    m0_Iq_Sum = axes[0]->motor_.current_control_.Ibus;
     //m0_Iq_Sum = -3.14159;  // 测试数据
 #if ODRIVE_CUR_DEBUG
     bool isNegative = (bool)(m0_Iq_Sum < 0);//判断正负
@@ -143,10 +161,11 @@ void CANSimple::motor0_Overload_Protection(void) {
         m0_Cur.Countdown++;
         if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
+            error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
         }
     }
     else {
-        m0_Cur.Countdown = 0;
+        m0_Cur.Countdown = 0;// 复位计数
     }
 #if ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
@@ -168,15 +187,16 @@ void CANSimple::motor0_Overload_Protection(void) {
 
 //过载保护，100ms检测一次电流数据
 void CANSimple::motor1_Overload_Protection(void) {
-    //平滑滤波
-    m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Ibus;
-    m1_Cur.Iq_Num++;
-    if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
     float m1_Iq_Sum = 0;
-    for(uint8_t i=0; i<FILTER_DEPTH; i++) {
-        m1_Iq_Sum += m1_Cur.Iq_Filter[i];
-    }
-    m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
+    //平滑滤波
+    // m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Ibus;
+    // m1_Cur.Iq_Num++;
+    // if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
+    // for(uint8_t i=0; i<FILTER_DEPTH; i++) {
+    //     m1_Iq_Sum += m1_Cur.Iq_Filter[i];
+    // }
+    // m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
+    m1_Iq_Sum = axes[1]->motor_.current_control_.Ibus;
 #if ODRIVE_CUR_DEBUG
     bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
 #endif
@@ -187,10 +207,11 @@ void CANSimple::motor1_Overload_Protection(void) {
         m1_Cur.Countdown++;
         if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
+            error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
         }
     }
     else {
-        m1_Cur.Countdown = 0;
+        m1_Cur.Countdown = 0;// 复位计数
     }
 
 #if ODRIVE_CUR_DEBUG
@@ -367,11 +388,13 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             clear_errors_callback(axes[0], msg);
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            error_ = 0;
         }
         else {
             clear_errors_callback(axes[1], msg);
             axes[1]->controller_.input_vel_ = 0;
             axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+            error_ = 0;
         }
         break;
     case DRIVE_RESTART:  // 重新启动

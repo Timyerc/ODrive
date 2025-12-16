@@ -33,11 +33,20 @@ class CANSimple {
         MSG_CLEAR_ERRORS,
         MSG_CO_HEARTBEAT_CMD = 0x700,  // CANOpen NMT Heartbeat  SEND
     };
+
+    enum {
+        ERROR_M0_OVER_CURRENT = 0x00000001,
+        ERROR_M1_OVER_CURRENT = 0x00000002,
+    };
+
+
     static uint32_t alive;
+    static uint32_t error_;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
     static void keepAlive(Axis* axis);
    private:
+
 
 
     // ovo-new
