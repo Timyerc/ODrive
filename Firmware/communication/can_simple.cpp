@@ -4,7 +4,7 @@
 
 #define USE_USER_CAN_CALLBACKS  1   // 使用自定义CAN回调函数
 #define ODRIVE_CUR_DEBUG        0   // 开启电流调试功能
-#define FILTER_DEPTH            30  // 滤波深度
+#define FILTER_DEPTH            100 // 滤波深度
 #define ODRIVE_CAN_TEST         0   // CAN测试功能开关
 
 // 定义静态成员变量
@@ -36,6 +36,7 @@ uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index) {
     data += can_getSignal<uint8_t>(msg, index + 24, 8, true);
     return data;
 }
+
 // 获取电机转速
 bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     can_Message_t txmsg;
@@ -110,24 +111,28 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
 
 typedef struct
 {
-    uint8_t Countdown;//倒计时
-    uint8_t  Iq_Num;//滤波计数
-    float    Iq_Filter[FILTER_DEPTH];//滤波数组
+    uint16_t Countdown;//倒计时
+    uint16_t Iq_Num;//滤波计数
+    uint16_t index;//滤波索引
+    float Iq_Sum;//滤波和
+    float Iq_Filter[FILTER_DEPTH];//滤波数组
 } Cur_Filter_t;
 
 Cur_Filter_t m0_Cur;
 Cur_Filter_t m1_Cur;
-extern ODriveCAN::Config_t can_config;
+
+// 简单移动平均
+float MovingAverage(Cur_Filter_t* filter, float new_sample) {
+    filter->Iq_Sum -= filter->Iq_Filter[filter->index];
+    filter->Iq_Sum += new_sample;
+    filter->Iq_Filter[filter->index] = new_sample;
+    filter->index = (filter->index + 1) % FILTER_DEPTH;
+
+    return filter->Iq_Sum / FILTER_DEPTH;
+}
 
 // 电流过载故障处理
 void CANSimple::motor_current_fault(void) {
-    // for (size_t i = 0; i < AXIS_COUNT; ++i) {
-    //     safety_critical_disarm_motor_pwm(axes[i]->motor_);// 关闭PWM输出
-    //     axes[i]->controller_.input_vel_ = 0;// 速度清零
-    //     axes[i]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
-    //     axes[i]->motor_.error_ |= Motor::ERROR_DC_BUS_OVER_CURRENT;// 设置过流错误标志
-    // }
-
     axes[0]->controller_.input_vel_ = 0;// 速度清零
     axes[0]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
     axes[1]->controller_.input_vel_ = 0;// 速度清零
@@ -138,96 +143,73 @@ void CANSimple::motor_current_fault(void) {
 
 //过载保护，100ms检测一次M0电流数据
 void CANSimple::motor0_Overload_Protection(void) {
-    float m0_Iq_Sum = 0;
-    //平滑滤波
-    // m0_Cur.Iq_Filter[m0_Cur.Iq_Num] = axes[0]->motor_.current_control_.Ibus;
-    // m0_Cur.Iq_Num++;
-    // if (m0_Cur.Iq_Num >= FILTER_DEPTH)
-    //     m0_Cur.Iq_Num = 0;
+}
 
-    // for(uint8_t i=0; i<FILTER_DEPTH; i++) {
-    //     m0_Iq_Sum += m0_Cur.Iq_Filter[i];
-    // }
-    // m0_Iq_Sum = m0_Iq_Sum / FILTER_DEPTH;
+//过载保护，100ms检测一次电流数据
+void CANSimple::motor1_Overload_Protection(void) {
+}
 
-    m0_Iq_Sum = axes[0]->motor_.current_control_.Ibus;
-    //m0_Iq_Sum = -3.14159;  // 测试数据
-#if ODRIVE_CUR_DEBUG
-    bool isNegative = (bool)(m0_Iq_Sum < 0);//判断正负
-#endif
-    int32_t absoluteValue = (int32_t)(m0_Iq_Sum * 1000.0f * 1.2f);//毫安/校准系数
-    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
-    if(absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
+//电流过载保护输出
+void CANSimple::motor_overload_output(void) {
+    //int32_t m0_absoluteValue = (int32_t)(axes[0]->motor_.current_control_.Ibus * 1000.0f); // 毫安
+    //int32_t m1_absoluteValue = (int32_t)(axes[1]->motor_.current_control_.Ibus * 1000.0f); // 毫安
+    int32_t m0_absoluteValue = (int32_t)(MovingAverage(&m0_Cur,  axes[0]->motor_.current_control_.Ibus) * 1150.0f); // 毫安
+    int32_t m1_absoluteValue = (int32_t)(MovingAverage(&m1_Cur,  axes[1]->motor_.current_control_.Ibus) * 1150.0f); // 毫安
+
+    if(m0_absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
         if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
             error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
         }
-    }
-    else {
+    }else {
         m0_Cur.Countdown = 0;// 复位计数
     }
-#if ODRIVE_CUR_DEBUG
-    can_Message_t txmsg;
-    txmsg.id = axes[0]->config_.can_node_id + 4;
-    txmsg.isExt = true;
-    txmsg.len = 8;
-    // 使用除法和模运算提取各位
-    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
-    txmsg.buf[1] = (absoluteValue / 100000) % 10;
-    txmsg.buf[2] = (absoluteValue / 10000) % 10;
-    txmsg.buf[3] = (absoluteValue / 1000) % 10;
-    txmsg.buf[4] = 0xaa; // 小数点位置标志
-    txmsg.buf[5] = (absoluteValue / 100) % 10;
-    txmsg.buf[6] = (absoluteValue / 10) % 10;
-    txmsg.buf[7] = absoluteValue % 10;
-    odCAN->write(txmsg);
-#endif
-}
 
-//过载保护，100ms检测一次电流数据
-void CANSimple::motor1_Overload_Protection(void) {
-    float m1_Iq_Sum = 0;
-    //平滑滤波
-    // m1_Cur.Iq_Filter[m1_Cur.Iq_Num] = axes[1]->motor_.current_control_.Ibus;
-    // m1_Cur.Iq_Num++;
-    // if (m1_Cur.Iq_Num >= FILTER_DEPTH)m1_Cur.Iq_Num = 0;
-    // for(uint8_t i=0; i<FILTER_DEPTH; i++) {
-    //     m1_Iq_Sum += m1_Cur.Iq_Filter[i];
-    // }
-    // m1_Iq_Sum = m1_Iq_Sum / FILTER_DEPTH;
-    m1_Iq_Sum = axes[1]->motor_.current_control_.Ibus;
-#if ODRIVE_CUR_DEBUG
-    bool isNegative = (bool)(m1_Iq_Sum < 0);//判断正负
-#endif
-
-    int32_t absoluteValue = (int32_t)(m1_Iq_Sum * 1000.0f * 1.2f);//毫安/校准系数
-    absoluteValue = std::abs(static_cast<int32_t>(absoluteValue));//取绝对值
-    if(absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
+    if(m1_absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
         m1_Cur.Countdown++;
         if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
             error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
         }
-    }
-    else {
+    }else {
         m1_Cur.Countdown = 0;// 复位计数
     }
-
 #if ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
-    txmsg.id = axes[1]->config_.can_node_id + 5;
+    txmsg.id = 0x30;
     txmsg.isExt = true;
     txmsg.len = 8;
+if(m1_absoluteValue > axes[1]->config_.current_threshold_mA || m0_absoluteValue > axes[0]->config_.current_threshold_mA){
+    m0_absoluteValue = 4000;
+}
+if(error_){
+    m1_absoluteValue = 0;
+    m0_absoluteValue = 0;
+}
+
+#if 1
+    txmsg.buf[0] = m0_absoluteValue >> 24;
+    txmsg.buf[1] = m0_absoluteValue >> 16;
+    txmsg.buf[2] = m0_absoluteValue >> 8;
+    txmsg.buf[3] = m0_absoluteValue;
+
+    txmsg.buf[4] = m1_absoluteValue >> 24;
+    txmsg.buf[5] = m1_absoluteValue >> 16;
+    txmsg.buf[6] = m1_absoluteValue >> 8;
+    txmsg.buf[7] = m1_absoluteValue;
+#else
     // 使用除法和模运算提取各位
-    txmsg.buf[0] = (isNegative ? 0xff : 0); // 符号位
-    txmsg.buf[1] = (absoluteValue / 100000) % 10;
-    txmsg.buf[2] = (absoluteValue / 10000) % 10;
-    txmsg.buf[3] = (absoluteValue / 1000) % 10;
-    txmsg.buf[4] = 0xaa; // 小数点位置标志
-    txmsg.buf[5] = (absoluteValue / 100) % 10;
-    txmsg.buf[6] = (absoluteValue / 10) % 10;
-    txmsg.buf[7] = absoluteValue % 10;
+    txmsg.buf[0] = (m0_absoluteValue / 1000) % 10;
+    txmsg.buf[1] = (m0_absoluteValue / 100) % 10;
+    txmsg.buf[2] = (m0_absoluteValue / 10) % 10;
+    txmsg.buf[3] = m0_absoluteValue % 10;
+
+    txmsg.buf[4] = (m1_absoluteValue / 1000) % 10;
+    txmsg.buf[5] = (m1_absoluteValue / 100) % 10;
+    txmsg.buf[6] = (m1_absoluteValue / 10) % 10;
+    txmsg.buf[7] = m1_absoluteValue % 10;
+#endif
     odCAN->write(txmsg);
 #endif
 }
@@ -240,8 +222,9 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    motor0_Overload_Protection();
-    motor1_Overload_Protection();
+    // motor0_Overload_Protection();
+    // motor1_Overload_Protection();
+    motor_overload_output();
 
 #if ODRIVE_CAN_TEST
     can_Message_t txmsg;
@@ -400,6 +383,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_RESTART:  // 重新启动
         odrv.reboot();
         break;
+        
     default:
         break;
     }
