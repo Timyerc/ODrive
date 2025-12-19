@@ -54,8 +54,8 @@ class CANSimple {
     static uint16_t readDate16(const can_Message_t& msg, uint8_t index);
     static uint32_t readDate32(const can_Message_t& msg, uint8_t index);
     static bool sendMotorSpeed(Axis* axis,uint32_t motorNum);
-    static void motor0_Overload_Protection(void);
-    static void motor1_Overload_Protection(void);
+    static void hall_error_handing(void);
+    static void hot_plugging_error_handing(void);
     static void motor_overload_output(void);
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
     static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);

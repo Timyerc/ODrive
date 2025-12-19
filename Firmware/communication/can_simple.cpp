@@ -53,15 +53,15 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     if (txmsg.id == 0x02 || txmsg.id == 0x11) {
         Speed = -Speed;
     }
-
     // 状态码
-    if(error_){
+    if(error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x04;  // 自定义故障
         txmsg.buf[1] = error_ >> 24;
         txmsg.buf[2] = error_ >> 16;
         txmsg.buf[3] = error_ >> 8;
         txmsg.buf[4] = error_ ;
+        hot_plugging_error_handing();//热插拔错误
     } else if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
@@ -85,14 +85,14 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[4] = axis->sensorless_estimator_.error_ ;
     } else if (axis->controller_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x01;  // 
+        txmsg.buf[0] = 0x01;  //
         txmsg.buf[1] = axis->controller_.error_ >> 24;
         txmsg.buf[2] = axis->controller_.error_ >> 16;
         txmsg.buf[3] = axis->controller_.error_ >> 8;
         txmsg.buf[4] = axis->controller_.error_ ;
     } else if (axis->error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x02;  // 
+        txmsg.buf[0] = 0x02;  //
         txmsg.buf[1] = axis->error_ >> 24;
         txmsg.buf[2] = axis->error_ >> 16;
         txmsg.buf[3] = axis->error_ >> 8;
@@ -141,12 +141,37 @@ void CANSimple::motor_current_fault(void) {
     safety_critical_disarm_motor_pwm(axes[1]->motor_);// 关闭PWM输出
 }
 
-//过载保护，100ms检测一次M0电流数据
-void CANSimple::motor0_Overload_Protection(void) {
+//霍尔状态检测
+void CANSimple::hall_error_handing(void) {
+    static uint8_t hall_error = 0;
+    if(hall_error) {
+        if(axes[1]->encoder_.hall_state_ > 0 && axes[1]->encoder_.hall_state_ < 7) { //霍尔状态恢复正常
+            axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;//进入闭环控制状态
+            hall_error = 0;// 设置霍尔错误标志
+        }
+    } else {
+        if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
+            axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;//进入空闲状态
+            hall_error = 1;// 设置霍尔错误标志
+        }
+    }
 }
 
-//过载保护，100ms检测一次电流数据
-void CANSimple::motor1_Overload_Protection(void) {
+//热插拔错误处理
+void CANSimple::hot_plugging_error_handing(void) {
+    if(axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
+        axes[0]->clear_errors();
+        axes[0]->controller_.input_vel_ = 0;
+        axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        error_ = 0;
+    }
+
+    if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
+        axes[1]->clear_errors();
+        axes[1]->controller_.input_vel_ = 0;
+        axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        error_ = 0;
+    }
 }
 
 //电流过载保护输出
@@ -162,7 +187,7 @@ void CANSimple::motor_overload_output(void) {
             motor_current_fault();//关闭所有电机PWM输出
             error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
         }
-    }else {
+    } else {
         m0_Cur.Countdown = 0;// 复位计数
     }
 
@@ -172,7 +197,7 @@ void CANSimple::motor_overload_output(void) {
             motor_current_fault();//关闭所有电机PWM输出
             error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
         }
-    }else {
+    } else {
         m1_Cur.Countdown = 0;// 复位计数
     }
 #if ODRIVE_CUR_DEBUG
@@ -180,13 +205,13 @@ void CANSimple::motor_overload_output(void) {
     txmsg.id = 0x30;
     txmsg.isExt = true;
     txmsg.len = 8;
-if(m1_absoluteValue > axes[1]->config_.current_threshold_mA || m0_absoluteValue > axes[0]->config_.current_threshold_mA){
-    m0_absoluteValue = 4000;
-}
-if(error_){
-    m1_absoluteValue = 0;
-    m0_absoluteValue = 0;
-}
+    if(m1_absoluteValue > axes[1]->config_.current_threshold_mA || m0_absoluteValue > axes[0]->config_.current_threshold_mA) {
+        m0_absoluteValue = 4000;
+    }
+    if(error_) {
+        m1_absoluteValue = 0;
+        m0_absoluteValue = 0;
+    }
 
 #if 1
     txmsg.buf[0] = m0_absoluteValue >> 24;
@@ -222,8 +247,6 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    // motor0_Overload_Protection();
-    // motor1_Overload_Protection();
     motor_overload_output();
 
 #if ODRIVE_CAN_TEST
@@ -302,7 +325,7 @@ void CANSimple::get_motor_max_speed_limit(uint8_t msg_id)
 }
 
 // 设置电机最大速度限制
-void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed ,uint16_t m1_max_speed)
+void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,uint16_t m1_max_speed)
 {
     axes[0]->config_.max_speed_limit = m0_max_speed;
     axes[1]->config_.max_speed_limit = m1_max_speed;
@@ -367,7 +390,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         get_motor_max_speed_limit(DRIVE__GET_MAX_SPEED_LIMIT);
         break;
     case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
-        if(!readDate16(msg, 16)){
+        if(!readDate16(msg, 16)) {
             clear_errors_callback(axes[0], msg);
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
@@ -383,7 +406,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_RESTART:  // 重新启动
         odrv.reboot();
         break;
-        
+
     default:
         break;
     }
