@@ -56,12 +56,17 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     // 状态码
     if(error_) {
         txmsg.len = 5;
+        if(axis->encoder_.hall_state_ == 0 || axis->encoder_.hall_state_ == 7) {
+            error_ |= 0x4;
+            hot_plugging_error_handing();//热插拔错误
+        }
         txmsg.buf[0] = 0x04;  // 自定义故障
         txmsg.buf[1] = error_ >> 24;
         txmsg.buf[2] = error_ >> 16;
         txmsg.buf[3] = error_ >> 8;
         txmsg.buf[4] = error_ ;
-        hot_plugging_error_handing();//热插拔错误
+
+
     } else if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
@@ -159,19 +164,26 @@ void CANSimple::hall_error_handing(void) {
 
 //热插拔错误处理
 void CANSimple::hot_plugging_error_handing(void) {
-    if(axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
         axes[0]->clear_errors();
         axes[0]->controller_.input_vel_ = 0;
         axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-        error_ = 0;
-    }
-
-    if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
         axes[1]->clear_errors();
         axes[1]->controller_.input_vel_ = 0;
         axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
         error_ = 0;
-    }
+    // if(axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
+    //     axes[0]->clear_errors();
+    //     axes[0]->controller_.input_vel_ = 0;
+    //     axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+    //     error_ = 0;
+    // }
+
+    // if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
+    //     axes[1]->clear_errors();
+    //     axes[1]->controller_.input_vel_ = 0;
+    //     axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+    //     error_ = 0;
+    // }
 }
 
 //电流过载保护输出
