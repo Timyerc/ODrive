@@ -9,7 +9,7 @@
 
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
-uint32_t CANSimple::error_ = 0;
+
 
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
@@ -54,17 +54,13 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         Speed = -Speed;
     }
     // 状态码
-    if(error_) {
+    if(axis->motor_.user_error_) {
         txmsg.len = 5;
-        hot_plugging_error_handing();//热插拔错误
-        
         txmsg.buf[0] = 0x04;  // 自定义故障
-        txmsg.buf[1] = error_ >> 24;
-        txmsg.buf[2] = error_ >> 16;
-        txmsg.buf[3] = error_ >> 8;
-        txmsg.buf[4] = error_ ;
-
-
+        txmsg.buf[1] = axis->motor_.user_error_ >> 24;
+        txmsg.buf[2] = axis->motor_.user_error_ >> 16;
+        txmsg.buf[3] = axis->motor_.user_error_ >> 8;
+        txmsg.buf[4] = axis->motor_.user_error_ ;
     } else if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
@@ -148,33 +144,33 @@ void CANSimple::motor_current_fault(void) {
 void CANSimple::hall_error_handing(void) {
     if(axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
         axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;//进入空闲状态
-        error_ |= 0x4;// 设置霍尔错误标志
+        axes[0]->motor_.user_error_ |= ERROR_M0_ILLEGAL_HALL;// 设置霍尔错误标志
     }
 
     if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
         axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;//进入空闲状态
-        error_ |= 0x8;// 设置霍尔错误标志
+        axes[1]->motor_.user_error_ |= ERROR_M1_ILLEGAL_HALL;// 设置霍尔错误标志
     }
 }
 
 //热插拔错误处理
 void CANSimple::hot_plugging_error_handing(void) {
-    if(error_ & 0x4) {
+    if(axes[0]->motor_.user_error_ & ERROR_M0_ILLEGAL_HALL) {
         // 通过清除错误并重新进入闭环控制尝试恢复
         if(axes[0]->encoder_.hall_state_ != 0 && axes[0]->encoder_.hall_state_ != 7) {
             axes[0]->clear_errors();
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            error_ = 0;
+            axes[0]->motor_.user_error_ = 0;
         }
     }
-    if(error_ & 0x8) {
+    if(axes[1]->motor_.user_error_ & ERROR_M1_ILLEGAL_HALL) {
         if(axes[1]->encoder_.hall_state_ != 0 && axes[1]->encoder_.hall_state_ != 7) {
             // 通过清除错误并重新进入闭环控制尝试恢复
             axes[1]->clear_errors();
             axes[1]->controller_.input_vel_ = 0;
             axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            error_ = 0;
+            axes[1]->motor_.user_error_ = 0;
         }
     }
 }
@@ -190,7 +186,7 @@ void CANSimple::motor_overload_output(void) {
         m0_Cur.Countdown++;
         if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
-            error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
+            axes[0]->motor_.user_error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
         }
     } else {
         m0_Cur.Countdown = 0;// 复位计数
@@ -200,7 +196,7 @@ void CANSimple::motor_overload_output(void) {
         m1_Cur.Countdown++;
         if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
             motor_current_fault();//关闭所有电机PWM输出
-            error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
+            axes[1]->motor_.user_error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
         }
     } else {
         m1_Cur.Countdown = 0;// 复位计数
@@ -254,7 +250,7 @@ void CANSimple::keepAlive(Axis* axis) {
     }
     motor_overload_output();//电流过载保护输出
     hall_error_handing();//霍尔状态检测
-
+    hot_plugging_error_handing();//热插拔错误
 #if ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
@@ -400,13 +396,13 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             clear_errors_callback(axes[0], msg);
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            error_ = 0;
+            axes[0]->motor_.user_error_ = 0;
         }
         else {
             clear_errors_callback(axes[1], msg);
             axes[1]->controller_.input_vel_ = 0;
             axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            error_ = 0;
+            axes[1]->motor_.user_error_ = 0;
         }
         break;
     case DRIVE_RESTART:  // 重新启动

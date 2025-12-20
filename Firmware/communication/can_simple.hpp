@@ -37,11 +37,11 @@ class CANSimple {
     enum {
         ERROR_M0_OVER_CURRENT = 0x00000001,
         ERROR_M1_OVER_CURRENT = 0x00000002,
+        ERROR_M0_ILLEGAL_HALL = 0x00000004,
+        ERROR_M1_ILLEGAL_HALL = 0x00000008,
     };
 
-
     static uint32_t alive;
-    static uint32_t error_;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
     static void keepAlive(Axis* axis);
