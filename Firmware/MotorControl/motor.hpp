@@ -129,6 +129,7 @@ public:
 
     // variables exposed on protocol
     Error error_ = ERROR_NONE;
+    uint32_t user_error_ = 0;
     // Do not write to this variable directly!
     // It is for exclusive use by the safety_critical_... functions.
     ArmedState armed_state_ = ARMED_STATE_DISARMED; 

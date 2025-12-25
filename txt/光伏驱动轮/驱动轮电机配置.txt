@@ -1,6 +1,6 @@
-版本号：V0.5.3
-日期：  2025.12.10
-#擦除数据
+版本号：V0.5.4
+日期：  2025.12.12
+擦除数据
 odrv0.erase_configuration()
 
 #基本配置：
@@ -10,14 +10,14 @@ odrv0.config.dc_bus_overvoltage_trip_level = 56
 odrv0.config.dc_max_positive_current = 30
 odrv0.config.dc_max_negative_current = -20
 odrv0.config.max_regen_current = 0
-
 #M0电机参数
 odrv0.axis0.motor.config.pole_pairs = 2
 odrv0.axis0.motor.config.calibration_current = 10
 odrv0.axis0.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis0.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
 odrv0.axis0.motor.config.current_control_bandwidth = 10
-odrv0.axis0.motor.config.current_lim = 12
+odrv0.axis0.motor.config.current_lim = 15
+odrv0.axis0.motor.config.current_lim_margin = 15
 odrv0.axis0.motor.config.requested_current_range = 15
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 2
@@ -25,7 +25,8 @@ odrv0.axis1.motor.config.calibration_current = 10
 odrv0.axis1.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis1.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
 odrv0.axis1.motor.config.current_control_bandwidth = 10
-odrv0.axis1.motor.config.current_lim = 12
+odrv0.axis1.motor.config.current_lim = 15
+odrv0.axis0.motor.config.current_lim_margin = 15
 odrv0.axis1.motor.config.requested_current_range = 15
 
 #M0编码器参数
@@ -72,12 +73,14 @@ odrv0.axis0.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis0.config.startup_closed_loop_control=True#开机进入闭环
 odrv0.axis0.requested_state=AXIS_STATE_IDLE
 #odrv0.axis0.config.startup_encoder_offset_calibration =True#开机自检编码器，开机后自转
+odrv0.axis0.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
 
 odrv0.axis1.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis1.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis1.config.startup_closed_loop_control=True#开机进入闭环
 odrv0.axis1.requested_state=AXIS_STATE_IDLE
 #odrv0.axis1.config.startup_encoder_offset_calibration =True#开机自检编码器，开机后自转
+odrv0.axis1.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
 odrv0.save_configuration()
 odrv0.reboot()
 

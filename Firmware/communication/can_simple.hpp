@@ -33,6 +33,14 @@ class CANSimple {
         MSG_CLEAR_ERRORS,
         MSG_CO_HEARTBEAT_CMD = 0x700,  // CANOpen NMT Heartbeat  SEND
     };
+
+    enum {
+        ERROR_M0_OVER_CURRENT = 0x00000001,
+        ERROR_M1_OVER_CURRENT = 0x00000002,
+        ERROR_M0_ILLEGAL_HALL = 0x00000004,
+        ERROR_M1_ILLEGAL_HALL = 0x00000008,
+    };
+
     static uint32_t alive;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
@@ -40,13 +48,15 @@ class CANSimple {
    private:
 
 
+
     // ovo-new
     static uint8_t readDate8(const can_Message_t& msg, uint8_t index);
     static uint16_t readDate16(const can_Message_t& msg, uint8_t index);
     static uint32_t readDate32(const can_Message_t& msg, uint8_t index);
     static bool sendMotorSpeed(Axis* axis,uint32_t motorNum);
-    static void motor0_Overload_Protection(void);
-    static void motor1_Overload_Protection(void);
+    static void hall_error_handing(void);
+    static void hot_plugging_error_handing(void);
+    static void motor_overload_output(void);
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
     static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);
     static void get_motor_max_speed_limit(uint8_t msg_id);
