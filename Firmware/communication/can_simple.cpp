@@ -119,6 +119,7 @@ typedef struct
 
 Cur_Filter_t m0_Cur;
 Cur_Filter_t m1_Cur;
+Cur_Filter_t ibus;
 
 // 简单移动平均
 float MovingAverage(Cur_Filter_t* filter, float new_sample) {
@@ -175,13 +176,16 @@ void CANSimple::hot_plugging_error_handing(void) {
     }
 }
 
+int32_t m0_absoluteValue; // 毫安
+int32_t m1_absoluteValue; // 毫安
+int32_t ibus_absoluteValue; // 毫安
 //电流过载保护输出
 void CANSimple::motor_overload_output(void) {
     //int32_t m0_absoluteValue = (int32_t)(axes[0]->motor_.current_control_.Ibus * 1000.0f); // 毫安
     //int32_t m1_absoluteValue = (int32_t)(axes[1]->motor_.current_control_.Ibus * 1000.0f); // 毫安
-    int32_t m0_absoluteValue = (int32_t)(MovingAverage(&m0_Cur,  axes[0]->motor_.current_control_.Ibus) * 1150.0f); // 毫安
-    int32_t m1_absoluteValue = (int32_t)(MovingAverage(&m1_Cur,  axes[1]->motor_.current_control_.Ibus) * 1150.0f); // 毫安
-
+    m0_absoluteValue = (int32_t)(MovingAverage(&m0_Cur,  axes[0]->motor_.current_control_.Ibus) * 1000.0f); // 毫安
+    m1_absoluteValue = (int32_t)(MovingAverage(&m1_Cur,  axes[1]->motor_.current_control_.Ibus) * 1000.0f); // 毫安
+    ibus_absoluteValue = (int32_t)(MovingAverage(&ibus,  ibus_) * 1000.0f); // 毫安
     if(m0_absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
         m0_Cur.Countdown++;
         if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
@@ -337,12 +341,18 @@ void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,
     odrv.reboot();
 }
 
+
 void CANSimple::handle_can_message(can_Message_t& msg) {
 #if ODRIVE_CAN_TEST
     odCAN->write(msg);//返回接收到的数据
 #endif
 
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
+        axes[0]->watchdog_feed();
+        axes[1]->watchdog_feed();
+        alive = 0;  // 收到消息，清零保活计数
+    }else if(msg.id == 0x123){//debug
+        odrive_debug(msg);
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
         alive = 0;  // 收到消息，清零保活计数
