@@ -63,9 +63,7 @@ class CANSimple {
     static void set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed ,uint16_t m1_max_speed);
     static void motor_current_fault(void);
     static void odrive_debug(can_Message_t& msg);
-    static void get_odrive_current(uint16_t msg_id);
-    static void get_odrive_vbat_speed(uint16_t msg_id);
-    static void send_odrive_data(uint16_t msg_id, uint32_t type, uint32_t value);
+    static void send_odrive_data(uint16_t msg_id, uint8_t type);
 
 
     static void nmt_callback(Axis* axis, can_Message_t& msg);
