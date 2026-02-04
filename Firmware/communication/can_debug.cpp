@@ -78,10 +78,10 @@ void CANSimple::send_odrive_data(uint16_t msg_id, uint8_t type)
             value = axes[1]->encoder_.hall_state_;
             break;
         case ODRV_M0_ANGLE:
-            value = (int32_t)((*axes[0]->controller_.pos_estimate_circular_src_) * 360.0f);  // 转子位置
+            value = (int32_t)((*axes[0]->controller_.pos_estimate_circular_src_) * 3600.0f);  // 转子位置
             break;
         case ODRV_M1_ANGLE:
-            value = (int32_t)((*axes[1]->controller_.pos_estimate_circular_src_) * 360.0f);  // 转子位置
+            value = (int32_t)((*axes[1]->controller_.pos_estimate_circular_src_) * 3600.0f);  // 转子位置
             break;
         case ODRV_AIBUS:
             value = ibus_absoluteValue;// 平滑滤波，毫安
