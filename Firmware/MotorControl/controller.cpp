@@ -292,21 +292,34 @@ bool Controller::update(float* torque_setpoint_output) {
     if (anticogging_valid_ && config_.anticogging.anticogging_enabled) {
         torque += config_.anticogging.cogging_map[std::clamp(mod((int)anticogging_pos, 3600), 0, 3600)];
     }
-
+/*防抖动：目标速度后反馈都为零的时候*/
+static uint8_t stopFlag = 0;
     float v_err = 0.0f;
     if (config_.control_mode >= CONTROL_MODE_VELOCITY_CONTROL) {
         if (!vel_estimate_src) {
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
-
-        v_err = vel_des - *vel_estimate_src;
+        if (input_vel_ != 0 && stopFlag == 0) {
+            stopFlag = 1;
+        }else if (input_vel_ == 0 && *vel_estimate_src == 0 && stopFlag == 1) {
+            stopFlag = 2;
+        } else if(input_vel_ != 0 && stopFlag == 2){
+            stopFlag = 1;
+        }
+        
+        if (stopFlag != 2) {
+            v_err = vel_des - *vel_estimate_src;
+        } else {
+            v_err = 0;
+            vel_integrator_torque_ = 0;
+        }
         torque += (vel_gain * gain_scheduling_multiplier) * v_err;
 
         // Velocity integral action before limiting
         torque += vel_integrator_torque_;
     }
-
+/**/
     // Velocity limiting in current mode
     if (config_.control_mode < CONTROL_MODE_VELOCITY_CONTROL && config_.enable_current_mode_vel_limit) {
         if (!vel_estimate_src) {
