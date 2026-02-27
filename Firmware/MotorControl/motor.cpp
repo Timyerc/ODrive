@@ -356,11 +356,11 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     ictrl.Id_measured += ictrl.I_measured_report_filter_k * (Id - ictrl.Id_measured);
 
     // Check for violation of current limit
-    float I_trip = effective_current_lim() + config_.current_lim_margin;
-    if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
-        set_error(ERROR_CURRENT_LIMIT_VIOLATION);
-        return false;
-    }
+    // float I_trip = effective_current_lim() + config_.current_lim_margin;
+    // if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
+    //     set_error(ERROR_CURRENT_LIMIT_VIOLATION);
+    //     return false;
+    // }
 
     // Current error
     float Ierr_d = Id_des - Id;
