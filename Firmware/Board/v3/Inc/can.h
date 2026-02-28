@@ -104,7 +104,8 @@ typedef enum {
     DRIVE__SET_CURRENT_THRESHOLD  = 0xCA,      //设置电机过载电流阈值
     DRIVE__GET_CURRENT_THRESHOLD  = 0xCB,      //获取电机过载电流阈值
     DRIVE__SET_MAX_SPEED_LIMIT    = 0xCC,      //设置电机最大速度限制
-    DRIVE__GET_MAX_SPEED_LIMIT    = 0xCD,      //获取电机最大速度限制
+    DRIVE__GET_MAX_SPEED_LIMIT = 0xCD,      //获取电机最大速度限制
+    DRIVE__SET_VEL_PID    = 0xCE,      //获取电机最大速度限制
     // DRIVE_MOTOR_CALIBRATION = 0xCC,           //电机校准
     // DRIVE_ENCODER_OFFSET_CALIBRATION = 0xCD,  //编码器校准
     // DRIVE_CLOSED_LOOP_CONTROL = 0xCE,         //进入闭环模式
