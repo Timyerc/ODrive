@@ -6,9 +6,17 @@
 #endif
 
 #include "drv8301.h"
-
+extern uint8_t motorStopFlag;
 class Motor : public ODriveIntf::MotorIntf {
 public:
+    void setStopFlag(uint8_t flag)
+    {
+        motorStopFlag = flag;
+    }
+    uint8_t getStopFlag(void)
+    {
+        return motorStopFlag;
+    }
     struct Iph_BC_t {
         float phB;
         float phC;

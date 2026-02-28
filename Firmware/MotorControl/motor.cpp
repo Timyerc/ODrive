@@ -365,7 +365,12 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     // Current error
     float Ierr_d = Id_des - Id;
     float Ierr_q = Iq_des - Iq;
-
+    if (this->getStopFlag() == 2) {
+        Ierr_d = 0;
+        Ierr_q = 0;
+        ictrl.v_current_control_integral_d = 0;
+        ictrl.v_current_control_integral_q = 0;
+    }
     // TODO look into feed forward terms (esp omega, since PI pole maps to RL tau)
     // Apply PI control
     float Vd = ictrl.v_current_control_integral_d + Ierr_d * ictrl.p_gain;
