@@ -20,7 +20,6 @@ odrv0.axis0.motor.config.current_control_bandwidth = 100
 odrv0.axis0.motor.config.current_lim = 8
 odrv0.axis0.motor.config.current_lim_margin = 10
 odrv0.axis0.motor.config.requested_current_range = 15
-odrv0.axis0.motor.current_control.I_measured_report_filter_k = 0.1 //adc滤波系数
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 4
 odrv0.axis1.motor.config.calibration_current = 4
@@ -30,7 +29,6 @@ odrv0.axis1.motor.config.current_control_bandwidth = 100
 odrv0.axis1.motor.config.current_lim = 8
 odrv0.axis1.motor.config.current_lim_margin = 10
 odrv0.axis1.motor.config.requested_current_range = 15
-odrv0.axis1.motor.current_control.I_measured_report_filter_k = 0.1 //adc滤波系数
 
 #M0编码器参数
 odrv0.axis0.encoder.config.mode = ENCODER_MODE_HALL
