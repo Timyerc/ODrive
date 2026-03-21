@@ -157,7 +157,7 @@ public:
         .Iq_setpoint = 0.0f,
         .Iq_measured = 0.0f,
         .Id_measured = 0.0f,
-        .I_measured_report_filter_k = 1.0f,
+        .I_measured_report_filter_k = 0.1f,//Id,Iq轴滤波系数
         .max_allowed_current = 0.0f,
         .overcurrent_trip_level = 0.0f,
         .acim_rotor_flux = 0.0f,

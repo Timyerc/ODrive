@@ -356,12 +356,11 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     ictrl.Id_measured += ictrl.I_measured_report_filter_k * (Id - ictrl.Id_measured);
 
     // Check for violation of current limit
-    // float I_trip = effective_current_lim() + config_.current_lim_margin;
-    // if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
-    //     set_error(ERROR_CURRENT_LIMIT_VIOLATION);
-    //     return false;
-    // }
-
+    float I_trip = effective_current_lim() + config_.current_lim_margin;
+    if (SQ(ictrl.Id_measured) + SQ(ictrl.Iq_measured) > SQ(I_trip)) {
+        set_error(ERROR_CURRENT_LIMIT_VIOLATION);
+        return false;
+    }
     // Current error
     float Ierr_d = Id_des - Id;
     float Ierr_q = Iq_des - Iq;
@@ -396,7 +395,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     }
 
     // Compute estimated bus current
-    ictrl.Ibus = mod_d * Id + mod_q * Iq;
+    ictrl.Ibus = mod_d * ictrl.Id_measured + mod_q * ictrl.Iq_measured;
 
     // Inverse park transform
     float c_p = our_arm_cos_f32(pwm_phase);

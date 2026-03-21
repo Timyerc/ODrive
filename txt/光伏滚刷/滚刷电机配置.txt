@@ -8,7 +8,7 @@ odrv0.config.brake_resistance = 2
 odrv0.config.dc_bus_undervoltage_trip_level = 8
 odrv0.config.dc_bus_overvoltage_trip_level = 56
 odrv0.config.dc_max_positive_current  = 16
-odrv0.config.dc_max_negative_current = -3
+odrv0.config.dc_max_negative_current = -8
 odrv0.config.max_regen_current = 0
 
 #M0电机参数
@@ -20,6 +20,7 @@ odrv0.axis0.motor.config.current_control_bandwidth = 100
 odrv0.axis0.motor.config.current_lim = 8
 odrv0.axis0.motor.config.current_lim_margin = 10
 odrv0.axis0.motor.config.requested_current_range = 15
+odrv0.axis0.motor.current_control.I_measured_report_filter_k = 0.1 //adc滤波系数
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 4
 odrv0.axis1.motor.config.calibration_current = 4
@@ -29,6 +30,7 @@ odrv0.axis1.motor.config.current_control_bandwidth = 100
 odrv0.axis1.motor.config.current_lim = 8
 odrv0.axis1.motor.config.current_lim_margin = 10
 odrv0.axis1.motor.config.requested_current_range = 15
+odrv0.axis1.motor.current_control.I_measured_report_filter_k = 0.1 //adc滤波系数
 
 #M0编码器参数
 odrv0.axis0.encoder.config.mode = ENCODER_MODE_HALL
@@ -43,16 +45,16 @@ odrv0.axis1.encoder.config.bandwidth = 100
 odrv0.axis0.controller.config.control_mode = CONTROL_MODE_VELOCITY_CONTROL
 odrv0.axis0.controller.config.vel_limit = 65
 odrv0.axis0.controller.config.pos_gain = 0
-odrv0.axis0.controller.config.vel_gain = 0.005
-odrv0.axis0.controller.config.vel_integrator_gain = 0.001
+odrv0.axis0.controller.config.vel_gain = 0.008
+odrv0.axis0.controller.config.vel_integrator_gain = 0.002
 odrv0.axis0.controller.config.input_mode = INPUT_MODE_VEL_RAMP#INPUT_MODE_PASSTHROUGH
 odrv0.axis0.controller.config.vel_ramp_rate = 40
 #M1控制器配置，速度闭环
 odrv0.axis1.controller.config.control_mode = CONTROL_MODE_VELOCITY_CONTROL 
 odrv0.axis1.controller.config.vel_limit = 65
 odrv0.axis1.controller.config.pos_gain = 0
-odrv0.axis1.controller.config.vel_gain = 0.005
-odrv0.axis1.controller.config.vel_integrator_gain = 0.001
+odrv0.axis1.controller.config.vel_gain = 0.008
+odrv0.axis1.controller.config.vel_integrator_gain = 0.002
 odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP#INPUT_MODE_PASSTHROUGH
 odrv0.axis1.controller.config.vel_ramp_rate = 40
 
