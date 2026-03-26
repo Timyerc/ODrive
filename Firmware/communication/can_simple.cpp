@@ -4,7 +4,7 @@
 
 #define USE_USER_CAN_CALLBACKS  1   // 使用自定义CAN回调函数
 #define ODRIVE_CUR_DEBUG        0   // 开启电流调试功能
-#define FILTER_DEPTH            100 // 滤波深度
+#define FILTER_DEPTH            20 // 滤波深度
 #define ODRIVE_CAN_TEST         0   // CAN测试功能开关
 
 // 定义静态成员变量
