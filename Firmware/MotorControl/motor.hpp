@@ -171,4 +171,6 @@ public:
     float effective_current_lim_ = 10.0f;
 };
 
+#define USER_CUSTOM_MOTOR_CODE 1
+
 #endif // __MOTOR_HPP
