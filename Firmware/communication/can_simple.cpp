@@ -331,7 +331,7 @@ void CANSimple::get_motor_max_speed_limit(uint8_t msg_id)
 }
 
 // 设置电机速度环pid参数
-void CANSimple::ste_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velIntegratorGain)
+void CANSimple::set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velIntegratorGain)
 {
     if (id == 0) {
         axes[0]->controller_.config_.vel_gain = (float)velGain / 1000;
@@ -429,7 +429,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
         }
         break;
     case DRIVE__SET_VEL_PID:
-        ste_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
+        set_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
         break;
     case DRIVE_RESTART:  // 重新启动
         odrv.reboot();
