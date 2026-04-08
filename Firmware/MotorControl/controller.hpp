@@ -7,6 +7,16 @@
 
 class Controller : public ODriveIntf::ControllerIntf {
 public:
+#if USER_CUSTOM_MOTOR_CODE
+    void setStopFlag(uint8_t flag)
+    {
+        motorStopFlag = flag;
+    }
+    uint8_t getStopFlag(void)
+    {
+        return motorStopFlag;
+    }
+#endif
     typedef struct {
         uint32_t index = 0;
         float cogging_map[3600];

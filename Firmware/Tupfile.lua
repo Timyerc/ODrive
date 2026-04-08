@@ -199,6 +199,7 @@ build{
         'MotorControl/trapTraj.cpp',
         'MotorControl/main.cpp',
         'communication/can_simple.cpp',
+        'communication/can_debug.cpp',
         'communication/communication.cpp',
         'communication/ascii_protocol.cpp',
         'communication/interface_uart.cpp',

@@ -4,6 +4,10 @@
 
 #include <algorithm>
 
+#if USER_CUSTOM_MOTOR_CODE
+    uint8_t motorStopFlag = 0;
+#endif
+
 Controller::Controller(Config_t& config) :
     config_(config)
 {
@@ -292,15 +296,31 @@ bool Controller::update(float* torque_setpoint_output) {
     if (anticogging_valid_ && config_.anticogging.anticogging_enabled) {
         torque += config_.anticogging.cogging_map[std::clamp(mod((int)anticogging_pos, 3600), 0, 3600)];
     }
-
+/*防抖动：目标速度后反馈都为零的时候*/
     float v_err = 0.0f;
     if (config_.control_mode >= CONTROL_MODE_VELOCITY_CONTROL) {
         if (!vel_estimate_src) {
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
-
+#if USER_CUSTOM_MOTOR_CODE
+        if (input_vel_ != 0 && this->getStopFlag() == 0) {
+            this->setStopFlag(1);
+        }else if (input_vel_ == 0 && *vel_estimate_src == 0 && this->getStopFlag() == 1) {
+            this->setStopFlag(2);
+        } else if(input_vel_ != 0 && this->getStopFlag() == 2){
+            this->setStopFlag(1);
+        }
+        
+        if (this->getStopFlag() != 2) {
+            v_err = vel_des - *vel_estimate_src;
+        } else {
+            v_err = 0;
+            vel_integrator_torque_ = 0;
+        }
+#else
         v_err = vel_des - *vel_estimate_src;
+#endif
         torque += (vel_gain * gain_scheduling_multiplier) * v_err;
 
         // Velocity integral action before limiting

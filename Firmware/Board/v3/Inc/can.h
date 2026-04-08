@@ -100,11 +100,12 @@
 #define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
 
 typedef enum {
-    DRIVE_CLEAR_ERRORS = 0xC0,                //电机错误状态清除
+    DRIVE_CLEAR_ERRORS            = 0xC0,                //电机错误状态清除
     DRIVE__SET_CURRENT_THRESHOLD  = 0xCA,      //设置电机过载电流阈值
     DRIVE__GET_CURRENT_THRESHOLD  = 0xCB,      //获取电机过载电流阈值
     DRIVE__SET_MAX_SPEED_LIMIT    = 0xCC,      //设置电机最大速度限制
     DRIVE__GET_MAX_SPEED_LIMIT    = 0xCD,      //获取电机最大速度限制
+    DRIVE__SET_VEL_PID            = 0xCE,      //设置电机速度环PID参数
     // DRIVE_MOTOR_CALIBRATION = 0xCC,           //电机校准
     // DRIVE_ENCODER_OFFSET_CALIBRATION = 0xCD,  //编码器校准
     // DRIVE_CLOSED_LOOP_CONTROL = 0xCE,         //进入闭环模式

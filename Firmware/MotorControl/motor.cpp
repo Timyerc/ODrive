@@ -357,15 +357,26 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 
     // Check for violation of current limit
     float I_trip = effective_current_lim() + config_.current_lim_margin;
+#if USER_CUSTOM_MOTOR_CODE
+    if (SQ(ictrl.Id_measured) + SQ(ictrl.Iq_measured) > SQ(I_trip)) {
+#else
     if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
+#endif
         set_error(ERROR_CURRENT_LIMIT_VIOLATION);
         return false;
     }
-
     // Current error
     float Ierr_d = Id_des - Id;
     float Ierr_q = Iq_des - Iq;
-
+#if USER_CUSTOM_MOTOR_CODE
+    // For testing - if stop flag is 2, ignore current error and just run open
+    if (this->getStopFlag() == 2) {
+        Ierr_d = 0;
+        Ierr_q = 0;
+        ictrl.v_current_control_integral_d = 0;
+        ictrl.v_current_control_integral_q = 0;
+    }
+#endif
     // TODO look into feed forward terms (esp omega, since PI pole maps to RL tau)
     // Apply PI control
     float Vd = ictrl.v_current_control_integral_d + Ierr_d * ictrl.p_gain;
@@ -391,7 +402,11 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     }
 
     // Compute estimated bus current
+#if USER_CUSTOM_MOTOR_CODE
+    ictrl.Ibus = mod_d * ictrl.Id_measured + mod_q * ictrl.Iq_measured;
+#else
     ictrl.Ibus = mod_d * Id + mod_q * Iq;
+#endif
 
     // Inverse park transform
     float c_p = our_arm_cos_f32(pwm_phase);

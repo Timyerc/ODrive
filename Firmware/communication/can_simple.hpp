@@ -60,8 +60,12 @@ class CANSimple {
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
     static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);
     static void get_motor_max_speed_limit(uint8_t msg_id);
-    static void set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed ,uint16_t m1_max_speed);
+    static void set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed, uint16_t m1_max_speed);
+    static void set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velIntegratorGain);
     static void motor_current_fault(void);
+    static void odrive_debug(can_Message_t& msg);
+    static void send_odrive_data(uint16_t msg_id, uint8_t type);
+
 
     static void nmt_callback(Axis* axis, can_Message_t& msg);
     static void estop_callback(Axis* axis, can_Message_t& msg);
