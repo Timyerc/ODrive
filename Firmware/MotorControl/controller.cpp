@@ -4,7 +4,9 @@
 
 #include <algorithm>
 
-uint8_t motorStopFlag = 0;
+#if USER_CUSTOM_MOTOR_CODE
+    uint8_t motorStopFlag = 0;
+#endif
 
 Controller::Controller(Config_t& config) :
     config_(config)
@@ -301,7 +303,7 @@ bool Controller::update(float* torque_setpoint_output) {
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
-        
+#if USER_CUSTOM_MOTOR_CODE
         if (input_vel_ != 0 && this->getStopFlag() == 0) {
             this->setStopFlag(1);
         }else if (input_vel_ == 0 && *vel_estimate_src == 0 && this->getStopFlag() == 1) {
@@ -316,6 +318,9 @@ bool Controller::update(float* torque_setpoint_output) {
             v_err = 0;
             vel_integrator_torque_ = 0;
         }
+#else
+        v_err = vel_des - *vel_estimate_src;
+#endif
         torque += (vel_gain * gain_scheduling_multiplier) * v_err;
 
         // Velocity integral action before limiting

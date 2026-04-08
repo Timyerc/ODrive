@@ -1,14 +1,18 @@
 #ifndef __MOTOR_HPP
 #define __MOTOR_HPP
+#define USER_CUSTOM_MOTOR_CODE 1
 
 #ifndef __ODRIVE_MAIN_H
 #error "This file should not be included directly. Include odrive_main.h instead."
 #endif
 
 #include "drv8301.h"
+#if USER_CUSTOM_MOTOR_CODE
 extern uint8_t motorStopFlag;
+#endif
 class Motor : public ODriveIntf::MotorIntf {
 public:
+#if USER_CUSTOM_MOTOR_CODE
     void setStopFlag(uint8_t flag)
     {
         motorStopFlag = flag;
@@ -17,6 +21,7 @@ public:
     {
         return motorStopFlag;
     }
+#endif
     struct Iph_BC_t {
         float phB;
         float phC;
@@ -157,7 +162,11 @@ public:
         .Iq_setpoint = 0.0f,
         .Iq_measured = 0.0f,
         .Id_measured = 0.0f,
+#if USER_CUSTOM_MOTOR_CODE
         .I_measured_report_filter_k = 0.1f,//Id,Iq轴滤波系数
+#else
+        .I_measured_report_filter_k = 1.0f,
+#endif
         .max_allowed_current = 0.0f,
         .overcurrent_trip_level = 0.0f,
         .acim_rotor_flux = 0.0f,
@@ -170,7 +179,5 @@ public:
     DRV_SPI_8301_Vars_t gate_driver_regs_; //Local view of DRV registers (initialized by DRV8301_setup)
     float effective_current_lim_ = 10.0f;
 };
-
-#define USER_CUSTOM_MOTOR_CODE 1
 
 #endif // __MOTOR_HPP

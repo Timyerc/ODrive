@@ -7,7 +7,7 @@
         {
             "name": "Jlink_Debug",
             "cwd": "${workspaceFolder}",           
-            "executable": "Firmware\\build\\ODriveFirmware.elf",     
+            "executable": "Firmware\\build\\ODriveFirmware.elf",  
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
@@ -15,9 +15,34 @@
             "interface": "swd",
             "device": "STM32F405RG",
             "toolchainPrefix": "arm-none-eabi",
-            //"serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
-            //"gdbPath": "D:\\OdrivePATH\\arm-gnu-toolchain-14.3.rel1-mingw-w64-i686-arm-none-eabi\\bin\\arm-none-eabi-gdb.exe",
-            //"svdFile": "C:\\Keil_v5\\ARM\\PACK\\Keil\\LCM32F0xx_DFP\\0.4.71\\SVD\\LCM32F067.svd",
+            
+            // 关键修改1：明确指定GDB路径
+            "gdbPath": "E:\\Odrvie\\PATH\\gcc-arm-none-eabi-10.3-2021.10-win32\\gcc-arm-none-eabi-10.3-2021.10\\bin\\arm-none-eabi-gdb.exe",
+            
+            // 关键修改2：添加objdump和nm路径（解决ENOENT错误）
+            "objdumpPath": "E:\\Odrvie\\PATH\\gcc-arm-none-eabi-10.3-2021.10-win32\\gcc-arm-none-eabi-10.3-2021.10\\bin\\arm-none-eabi-objdump.exe",
+            "nmPath": "E:\\Odrvie\\PATH\\gcc-arm-none-eabi-10.3-2021.10-win32\\gcc-arm-none-eabi-10.3-2021.10\\bin\\arm-none-eabi-nm.exe",
+            
+            "serverpath": "C:\\Program Files\\SEGGER\\JLink_V854\\JLinkGDBServerCL.exe",
+            "svdFile": "F:\\GitHub\\ODrive\\Firmware\\Board\\v3\\STM32F40x.svd",
+            
+            // 关键修改3：源码路径映射（解决无法显示main的问题）
+            "sourceFileMap": {
+                "..": "F:/GitHub/ODrive/Firmware",
+                "../CommonTables": "F:/GitHub/ODrive/Firmware/CommonTables",
+                "/c/GitHub/ODrive/Firmware": "F:/GitHub/ODrive/Firmware",
+                "Firmware/": "F:/GitHub/ODrive/Firmware/"
+            },
+            
+            // 可选：添加预启动命令确保进入main
+            "preLaunchCommands": [
+                "set print demangle on",
+                "set print asm-demangle on"
+            ],
+            
+            // 可选：显示更多调试信息
+            "showDevDebugOutput": "raw",  // 临时开启，查看详细GDB交互
+            
             "liveWatch": {
                 "enabled": true,
                 "samplesPerSecond": 4
