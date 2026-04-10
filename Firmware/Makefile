@@ -28,7 +28,65 @@ flashbmp: all
 		--ex 'detach' \
 		--ex 'quit' \
 		$(FIRMWARE)
+# J-Link 配置
+JLINK_DEVICE := STM32F405RG
+JLINK_IF := SWD
+JLINK_SPEED := 4000
+JLINK_PORT := 2331
 
+# J-Link 配置 - 使用你的实际安装路径
+JLINK_PATH := "C:/Program Files/SEGGER/JLink_V854"
+JLINK_GDB_SERVER := $(JLINK_PATH)/JLinkGDBServerCL.exe
+JLINK_COMMANDER := $(JLINK_PATH)/JLink.exe
+JLINK_DEVICE := STM32F405RG
+JLINK_IF := SWD
+JLINK_SPEED := 4000
+JLINK_PORT := 2331
+
+# J-Link 烧录（使用 Commander）
+jlink-flash: all
+	@echo "Flashing with J-Link..."
+	@if [ ! -f jlink_flash.jlink ]; then \
+		echo "Creating jlink_flash.jlink..."; \
+		echo "device $(JLINK_DEVICE)" > jlink_flash.jlink; \
+		echo "si $(JLINK_IF)" >> jlink_flash.jlink; \
+		echo "speed $(JLINK_SPEED)" >> jlink_flash.jlink; \
+		echo "connect" >> jlink_flash.jlink; \
+		echo "erase" >> jlink_flash.jlink; \
+		echo "loadfile $(FIRMWARE_HEX)" >> jlink_flash.jlink; \
+		echo "r" >> jlink_flash.jlink; \
+		echo "g" >> jlink_flash.jlink; \
+		echo "exit" >> jlink_flash.jlink; \
+	fi
+	"$(JLINK_PATH)/JLink.exe" -device $(JLINK_DEVICE) -if $(JLINK_IF) -speed $(JLINK_SPEED) -CommanderScript jlink_flash.jlink
+
+# J-Link 调试（手动模式）
+jlink: all
+	@echo ""
+	@echo "========================================="
+	@echo "J-Link Debug Session"
+	@echo "========================================="
+	@echo "Please follow these steps:"
+	@echo ""
+	@echo "1. Open a new terminal and run:"
+	@echo "   \"$(JLINK_GDB_SERVER)\" -device $(JLINK_DEVICE) -if $(JLINK_IF) -speed $(JLINK_SPEED) -port $(JLINK_PORT)"
+	@echo ""
+	@echo "2. Press Enter here after GDB Server is running"
+	@echo "========================================="
+	@read -p "Press Enter to continue..."
+	@echo ""
+	@echo "Starting GDB..."
+	arm-none-eabi-gdb $(FIRMWARE) -x jlink.gdbinit
+
+# J-Link 调试（自动启动 Server，需要 PowerShell）
+jlink-auto: all
+	@echo "Starting J-Link GDB Server..."
+	@powershell.exe -Command "Start-Process -WindowStyle Minimized '$(JLINK_GDB_SERVER)' -ArgumentList '-device $(JLINK_DEVICE)','-if $(JLINK_IF)','-speed $(JLINK_SPEED)','-port $(JLINK_PORT)'"
+	@echo "Waiting for server (3 seconds)..."
+	@sleep 3
+	@echo "Starting GDB..."
+	arm-none-eabi-gdb $(FIRMWARE) -x jlink.gdbinit
+# 注意：如果 GDB 无法连接，请确保 J-Link GDB Server 已正确启动，并且端口号与 jlink.gdbinit 中的设置一致。
 gdb: all
 	arm-none-eabi-gdb $(FIRMWARE) -x openocd.gdbinit
 
