@@ -12,7 +12,7 @@ odrv0.config.dc_max_negative_current = -20
 odrv0.config.max_regen_current = 0
 #M0电机参数
 odrv0.axis0.motor.config.pole_pairs = 4
-odrv0.axis0.motor.config.calibration_current = 4
+odrv0.axis0.motor.config.calibration_current = 6
 odrv0.axis0.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis0.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
 odrv0.axis0.motor.config.current_control_bandwidth = 10
@@ -22,14 +22,14 @@ odrv0.axis0.motor.config.requested_current_range = 30
 odrv0.axis0.motor.config.torque_lim = 0.35
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 4
-odrv0.axis1.motor.config.calibration_current = 4
+odrv0.axis1.motor.config.calibration_current = 6
 odrv0.axis1.motor.config.resistance_calib_max_voltage = 10
 odrv0.axis1.motor.config.motor_type =0# MOTOR_TYPE_HIGH_CURRENT
 odrv0.axis1.motor.config.current_control_bandwidth = 10
 odrv0.axis1.motor.config.current_lim = 15
 odrv0.axis1.motor.config.current_lim_margin = 15
 odrv0.axis1.motor.config.requested_current_range = 30
-odrv0.axis1.motor.config.torque_lim = 0.35
+odrv0.axis1.motor.config.torque_lim = 0.32
 
 #M0编码器参数
 odrv0.axis0.encoder.config.mode = ENCODER_MODE_HALL

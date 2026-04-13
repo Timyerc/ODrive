@@ -54,14 +54,15 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         Speed = -Speed;
     }
     // 状态码
-    if(axis->motor_.user_error_) {
-        txmsg.len = 5;
-        txmsg.buf[0] = 0x04;  // 自定义故障
-        txmsg.buf[1] = axis->motor_.user_error_ >> 24;
-        txmsg.buf[2] = axis->motor_.user_error_ >> 16;
-        txmsg.buf[3] = axis->motor_.user_error_ >> 8;
-        txmsg.buf[4] = axis->motor_.user_error_ ;
-    } else if (axis->motor_.error_) {
+    // if(axis->motor_.user_error_) {
+    //     txmsg.len = 5;
+    //     txmsg.buf[0] = 0x04;  // 自定义故障
+    //     txmsg.buf[1] = axis->motor_.user_error_ >> 24;
+    //     txmsg.buf[2] = axis->motor_.user_error_ >> 16;
+    //     txmsg.buf[3] = axis->motor_.user_error_ >> 8;
+    //     txmsg.buf[4] = axis->motor_.user_error_ ;
+    // } else 
+    if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
         txmsg.buf[1] = axis->motor_.error_ >> 24;
