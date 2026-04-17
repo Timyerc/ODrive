@@ -1,18 +1,22 @@
 #ifndef __MOTOR_HPP
 #define __MOTOR_HPP
-#define USER_CUSTOM_MOTOR_CODE 1
+
+#define USER_CUSTOM_MOTOR_CODE_1 1 //解决电机抖动问题：当目标速度和反馈速度都为零时，设置一个停止标志位，禁止电机输出，直到下次目标速度不为零时才允许输出。
+#define USER_CUSTOM_MOTOR_CODE_2 1 //增加一个接口，允许外部代码设置和获取这个停止标志位，以便在其他地方也能控制电机的输出。
+#define USER_CUSTOM_MOTOR_CODE_3 1 //在电流限制检查和电流控制计算中使用测量的电流值而不是滤波后的值，以实现更快的过流保护和更直接的电流控制。
+
 
 #ifndef __ODRIVE_MAIN_H
 #error "This file should not be included directly. Include odrive_main.h instead."
 #endif
 
 #include "drv8301.h"
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_2
 extern uint8_t motorStopFlag;
 #endif
 class Motor : public ODriveIntf::MotorIntf {
 public:
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_2
     void setStopFlag(uint8_t flag)
     {
         motorStopFlag = flag;
@@ -162,7 +166,7 @@ public:
         .Iq_setpoint = 0.0f,
         .Iq_measured = 0.0f,
         .Id_measured = 0.0f,
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_3
         .I_measured_report_filter_k = 0.1f,//Id,Iq轴滤波系数
 #else
         .I_measured_report_filter_k = 1.0f,

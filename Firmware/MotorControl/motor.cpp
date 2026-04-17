@@ -357,7 +357,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 
     // Check for violation of current limit
     float I_trip = effective_current_lim() + config_.current_lim_margin;
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_3
     if (SQ(ictrl.Id_measured) + SQ(ictrl.Iq_measured) > SQ(I_trip)) {
 #else
     if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
@@ -368,7 +368,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     // Current error
     float Ierr_d = Id_des - Id;
     float Ierr_q = Iq_des - Iq;
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_3
     // For testing - if stop flag is 2, ignore current error and just run open
     if (this->getStopFlag() == 2) {
         Ierr_d = 0;
@@ -402,7 +402,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     }
 
     // Compute estimated bus current
-#if USER_CUSTOM_MOTOR_CODE
+#if USER_CUSTOM_MOTOR_CODE_3
     ictrl.Ibus = mod_d * ictrl.Id_measured + mod_q * ictrl.Iq_measured;
 #else
     ictrl.Ibus = mod_d * Id + mod_q * Iq;
