@@ -379,10 +379,11 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_COMMAND0_SPEED:  // 轮子转速设置0X01
         // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
         command.leftSpeed = readDate16(msg, 8);
+        command.rightSpeed = readDate16(msg, 24);      
         axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit  / 32768;  // 进行速度换算
-
-        command.rightSpeed = readDate16(msg, 24);
         axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit  / 32768;  // 进行速度换算
+        // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+        // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
         break;
 
     case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06

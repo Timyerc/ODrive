@@ -125,3 +125,6 @@ odrv0.axis1.motor.config.pre_calibrated = True
 
 odrv0.axis0.motor.config.torque_lim = float('inf')  # 设置m0扭矩为无穷大
 odrv0.axis1.motor.config.torque_lim = float('inf')  # 设置m1扭矩为无穷大
+
+odrv0.axis0.controller.input_vel = 50
+odrv0.axis1.controller.input_vel = 50
