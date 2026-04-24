@@ -217,18 +217,18 @@ void start_adc_pwm() {
     __HAL_DBGMCU_FREEZE_TIM13();
 
     start_pwm(&htim1);
-    start_pwm(&htim8);
+    // start_pwm(&htim8);
     // TODO: explain why this offset
     sync_timers(&htim1, &htim8, TIM_CLOCKSOURCE_ITR0, TIM_1_8_PERIOD_CLOCKS / 2 - 1 * 128,
             &htim13);
 
     // Motor output starts in the disabled state
     __HAL_TIM_MOE_DISABLE_UNCONDITIONALLY(&htim1);
-    __HAL_TIM_MOE_DISABLE_UNCONDITIONALLY(&htim8);
+    // __HAL_TIM_MOE_DISABLE_UNCONDITIONALLY(&htim8);
 
     // Enable the update interrupt (used to coherently sample GPIO)
     __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_UPDATE);
-    __HAL_TIM_ENABLE_IT(&htim8, TIM_IT_UPDATE);
+    // __HAL_TIM_ENABLE_IT(&htim8, TIM_IT_UPDATE);
 
     // Start brake resistor PWM in floating output configuration
     htim2.Instance->CCR3 = 0;
@@ -281,38 +281,38 @@ void sync_timers(TIM_HandleTypeDef* htim_a, TIM_HandleTypeDef* htim_b,
                  TIM_HandleTypeDef* htim_refbase) {
     // Store intial timer configs
     uint16_t MOE_store_a = htim_a->Instance->BDTR & (TIM_BDTR_MOE);
-    uint16_t MOE_store_b = htim_b->Instance->BDTR & (TIM_BDTR_MOE);
+    // uint16_t MOE_store_b = htim_b->Instance->BDTR & (TIM_BDTR_MOE);
     uint16_t CR2_store = htim_a->Instance->CR2;
-    uint16_t SMCR_store = htim_b->Instance->SMCR;
+    // uint16_t SMCR_store = htim_b->Instance->SMCR;
     // Turn off output
     htim_a->Instance->BDTR &= ~(TIM_BDTR_MOE);
-    htim_b->Instance->BDTR &= ~(TIM_BDTR_MOE);
+    // htim_b->Instance->BDTR &= ~(TIM_BDTR_MOE);
     // Disable both timer counters
     htim_a->Instance->CR1 &= ~TIM_CR1_CEN;
-    htim_b->Instance->CR1 &= ~TIM_CR1_CEN;
+    // htim_b->Instance->CR1 &= ~TIM_CR1_CEN;
     // Set first timer to send TRGO on counter enable
     htim_a->Instance->CR2 &= ~TIM_CR2_MMS;
     htim_a->Instance->CR2 |= TIM_TRGO_ENABLE;
     // Set Trigger Source of second timer to the TRGO of the first timer
-    htim_b->Instance->SMCR &= ~TIM_SMCR_TS;
-    htim_b->Instance->SMCR |= TIM_CLOCKSOURCE_ITRx;
+    // htim_b->Instance->SMCR &= ~TIM_SMCR_TS;
+    // htim_b->Instance->SMCR |= TIM_CLOCKSOURCE_ITRx;
     // Set 2nd timer to start on trigger
-    htim_b->Instance->SMCR &= ~TIM_SMCR_SMS;
-    htim_b->Instance->SMCR |= TIM_SLAVEMODE_TRIGGER;
+    // htim_b->Instance->SMCR &= ~TIM_SMCR_SMS;
+    // htim_b->Instance->SMCR |= TIM_SLAVEMODE_TRIGGER;
     // Dir bit is read only in center aligned mode, so we clear the mode for now
     uint16_t CMS_store_a = htim_a->Instance->CR1 & TIM_CR1_CMS;
-    uint16_t CMS_store_b = htim_b->Instance->CR1 & TIM_CR1_CMS;
+    // uint16_t CMS_store_b = htim_b->Instance->CR1 & TIM_CR1_CMS;
     htim_a->Instance->CR1 &= ~TIM_CR1_CMS;
-    htim_b->Instance->CR1 &= ~TIM_CR1_CMS;
+    // htim_b->Instance->CR1 &= ~TIM_CR1_CMS;
     // Set both timers to up-counting state
     htim_a->Instance->CR1 &= ~TIM_CR1_DIR;
-    htim_b->Instance->CR1 &= ~TIM_CR1_DIR;
+    // htim_b->Instance->CR1 &= ~TIM_CR1_DIR;
     // Restore center aligned mode
     htim_a->Instance->CR1 |= CMS_store_a;
-    htim_b->Instance->CR1 |= CMS_store_b;
+    // htim_b->Instance->CR1 |= CMS_store_b;
     // set counter offset
     htim_a->Instance->CNT = count_offset;
-    htim_b->Instance->CNT = 0;
+    // htim_b->Instance->CNT = 0;
     // Set and start reference timebase timer (if used)
     if (htim_refbase) {
         htim_refbase->Instance->CNT = count_offset;
@@ -322,10 +322,10 @@ void sync_timers(TIM_HandleTypeDef* htim_a, TIM_HandleTypeDef* htim_b,
     htim_a->Instance->CR1 |= (TIM_CR1_CEN);
     // Restore timer configs
     htim_a->Instance->CR2 = CR2_store;
-    htim_b->Instance->SMCR = SMCR_store;
+    // htim_b->Instance->SMCR = SMCR_store;
     // restore output
     htim_a->Instance->BDTR |= MOE_store_a;
-    htim_b->Instance->BDTR |= MOE_store_b;
+    // htim_b->Instance->BDTR |= MOE_store_b;
 }
 
 // @brief ADC1 measurements are written to this buffer by DMA
@@ -492,66 +492,38 @@ static void decode_hall_samples(Encoder& enc, uint16_t GPIO_samples[num_GPIO]) {
 // This is the callback from the ADC that we expect after the PWM has triggered an ADC conversion.
 // Timing diagram: Firmware/timing_diagram_v3.png
 void pwm_trig_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
-#define calib_tau 0.2f  //@TOTO make more easily configurable
+#define calib_tau 0.2f
     constexpr float calib_filter_k = CURRENT_MEAS_PERIOD / calib_tau;
 
-    // Ensure ADCs are expected ones to simplify the logic below
+    // 只允许 ADC2 和 ADC3 进入
     if (!(hadc == &hadc2 || hadc == &hadc3)) {
         low_level_fault(Motor::ERROR_ADC_FAILED);
         return;
-    };
+    }
 
-    // Motor 0 is on Timer 1, which triggers ADC 2 and 3 on an injected conversion
-    // Motor 1 is on Timer 8, which triggers ADC 2 and 3 on a regular conversion
-    // If the corresponding timer is counting up, we just sampled in SVM vector 0, i.e. real current
-    // If we are counting down, we just sampled in SVM vector 7, with zero current
-    Axis& axis = injected ? *axes[0] : *axes[1];
-    int axis_num = injected ? 0 : 1;
-    Axis& other_axis = injected ? *axes[1] : *axes[0];
+    // 单轴：固定使用 axis0
+    Axis& axis = *axes[0];
+    const int axis_num = 0;   // 仅用于 GPIO_port_samples 等索引
+
+    // 判断当前是真实电流采样（SVM 矢量 0）还是直流校准采样（SVM 矢量 7）
     bool counting_down = axis.motor_.hw_config_.timer->Instance->CR1 & TIM_CR1_DIR;
     bool current_meas_not_DC_CAL = !counting_down;
 
-    // Check the timing of the sequencing
+    // 记录时序（可选）
     if (current_meas_not_DC_CAL)
         axis.motor_.log_timing(TIMING_LOG_ADC_CB_I);
     else
         axis.motor_.log_timing(TIMING_LOG_ADC_CB_DC);
 
-    bool update_timings = false;
+    // 处理绝对值编码器 SPI 事务启动（仅当当前为真实电流采样时）
     if (hadc == &hadc2) {
-        if (&axis == axes[1] && counting_down)
-            update_timings = true; // update timings of M0
-        else if (&axis == axes[0] && !counting_down)
-            update_timings = true; // update timings of M1
-
-        // TODO: this is out of place here. However when moving it somewhere
-        // else we have to consider the timing requirements to prevent the SPI
-        // transfers of axis0 and axis1 from conflicting.
-        // Also see comment on sync_timers.
-        if((current_meas_not_DC_CAL && !axis_num) ||
-                (axis_num && !current_meas_not_DC_CAL)){
+        // 原双轴条件简化为：current_meas_not_DC_CAL 为真时启动
+        if (current_meas_not_DC_CAL) {
             axis.encoder_.abs_spi_start_transaction();
         }
     }
 
-    // Load next timings for the motor that we're not currently sampling
-    if (update_timings) {
-        if (!other_axis.motor_.next_timings_valid_) {
-            // the motor control loop failed to update the timings in time
-            // we must assume that it died and therefore float all phases
-            bool was_armed = safety_critical_disarm_motor_pwm(other_axis.motor_);
-            if (was_armed) {
-                other_axis.motor_.error_ |= Motor::ERROR_CONTROL_DEADLINE_MISSED;
-            }
-        } else {
-            other_axis.motor_.next_timings_valid_ = false;
-            safety_critical_apply_motor_pwm_timings(
-                other_axis.motor_, other_axis.motor_.next_timings_
-            );
-        }
-        update_brake_current();
-    }
-
+    // 读取 ADC 值
     uint32_t ADCValue;
     if (injected) {
         ADCValue = HAL_ADCEx_InjectedGetValue(hadc, ADC_INJECTED_RANK_1);
@@ -561,26 +533,21 @@ void pwm_trig_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
     float current = axis.motor_.phase_current_from_adcval(ADCValue);
 
     if (current_meas_not_DC_CAL) {
-        // ADC2 and ADC3 record the phB and phC currents concurrently,
-        // and their interrupts should arrive on the same clock cycle.
-        // We dispatch the callbacks in order, so ADC2 will always be processed before ADC3.
-        // Therefore we store the value from ADC2 and signal the thread that the
-        // measurement is ready when we receive the ADC3 measurement
-
-        // return or continue
+        // 真实电流采样：ADC2 存储 phB，ADC3 存储 phC 并触发控制线程
         if (hadc == &hadc2) {
             axis.motor_.current_meas_.phB = current - axis.motor_.DC_calib_.phB;
-            return;
+            return;   // 等待 ADC3 完成
         } else {
             axis.motor_.current_meas_.phC = current - axis.motor_.DC_calib_.phC;
         }
-        // Prepare hall readings
-        // TODO move this to inside encoder update function
+
+        // 读取霍尔传感器（如果使用）
         decode_hall_samples(axis.encoder_, GPIO_port_samples[axis_num]);
-        // Trigger axis thread
+
+        // 通知控制线程电流测量就绪
         axis.signal_current_meas();
     } else {
-        // DC_CAL measurement
+        // 直流校准采样：更新滤波后的 DC 偏置
         if (hadc == &hadc2) {
             axis.motor_.DC_calib_.phB += (current - axis.motor_.DC_calib_.phB) * calib_filter_k;
         } else {
@@ -603,8 +570,8 @@ void tim_update_cb(TIM_HandleTypeDef* htim) {
         sample_ch = 0;
         axis = axes[0];
     } else if (htim == &htim8) {
-        sample_ch = 1;
-        axis = axes[1];
+        // sample_ch = 1;
+        // axis = axes[1];
     } else {
         low_level_fault(Motor::ERROR_UNEXPECTED_TIMER_CALLBACK);
         return;
@@ -817,6 +784,6 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
     if(hspi->pRxBuffPtr == (uint8_t*)axes[0]->encoder_.abs_spi_dma_rx_)
         axes[0]->encoder_.abs_spi_cb();
-    else if (hspi->pRxBuffPtr == (uint8_t*)axes[1]->encoder_.abs_spi_dma_rx_)
-        axes[1]->encoder_.abs_spi_cb();
+    // else if (hspi->pRxBuffPtr == (uint8_t*)axes[1]->encoder_.abs_spi_dma_rx_)
+    //     axes[1]->encoder_.abs_spi_cb();
 }

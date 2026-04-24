@@ -224,7 +224,7 @@ void vApplicationIdleHook(void) {
         odrv.system_stats_.min_heap_space = xPortGetMinimumEverFreeHeapSize();
         odrv.system_stats_.min_stack_space_comms = uxTaskGetStackHighWaterMark(comm_thread) * sizeof(StackType_t);
         odrv.system_stats_.min_stack_space_axis0 = uxTaskGetStackHighWaterMark(axes[0]->thread_id_) * sizeof(StackType_t);
-        odrv.system_stats_.min_stack_space_axis1 = uxTaskGetStackHighWaterMark(axes[1]->thread_id_) * sizeof(StackType_t);
+        // odrv.system_stats_.min_stack_space_axis1 = uxTaskGetStackHighWaterMark(axes[1]->thread_id_) * sizeof(StackType_t);
         odrv.system_stats_.min_stack_space_usb = uxTaskGetStackHighWaterMark(usb_thread) * sizeof(StackType_t);
         odrv.system_stats_.min_stack_space_uart = uxTaskGetStackHighWaterMark(uart_thread) * sizeof(StackType_t);
         odrv.system_stats_.min_stack_space_usb_irq = uxTaskGetStackHighWaterMark(usb_irq_thread) * sizeof(StackType_t);
@@ -233,7 +233,7 @@ void vApplicationIdleHook(void) {
 
         // Actual usage, in bytes, so we don't have to math
         odrv.system_stats_.stack_usage_axis0 = axes[0]->stack_size_ - odrv.system_stats_.min_stack_space_axis0;
-        odrv.system_stats_.stack_usage_axis1 = axes[1]->stack_size_ - odrv.system_stats_.min_stack_space_axis1;
+        // odrv.system_stats_.stack_usage_axis1 = axes[1]->stack_size_ - odrv.system_stats_.min_stack_space_axis1;
         odrv.system_stats_.stack_usage_comms = stack_size_comm_thread - odrv.system_stats_.min_stack_space_comms;
         odrv.system_stats_.stack_usage_usb = stack_size_usb_thread - odrv.system_stats_.min_stack_space_usb;
         odrv.system_stats_.stack_usage_uart = stack_size_uart_thread - odrv.system_stats_.min_stack_space_uart;
