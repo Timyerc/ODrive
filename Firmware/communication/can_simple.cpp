@@ -54,14 +54,15 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         Speed = -Speed;
     }
     // 状态码
-    if(axis->motor_.user_error_) {
-        txmsg.len = 5;
-        txmsg.buf[0] = 0x04;  // 自定义故障
-        txmsg.buf[1] = axis->motor_.user_error_ >> 24;
-        txmsg.buf[2] = axis->motor_.user_error_ >> 16;
-        txmsg.buf[3] = axis->motor_.user_error_ >> 8;
-        txmsg.buf[4] = axis->motor_.user_error_ ;
-    } else if (axis->motor_.error_) {
+    // if(axis->motor_.user_error_) {
+    //     txmsg.len = 5;
+    //     txmsg.buf[0] = 0x04;  // 自定义故障
+    //     txmsg.buf[1] = axis->motor_.user_error_ >> 24;
+    //     txmsg.buf[2] = axis->motor_.user_error_ >> 16;
+    //     txmsg.buf[3] = axis->motor_.user_error_ >> 8;
+    //     txmsg.buf[4] = axis->motor_.user_error_ ;
+    // } else 
+    if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
         txmsg.buf[1] = axis->motor_.error_ >> 24;
@@ -378,10 +379,11 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_COMMAND0_SPEED:  // 轮子转速设置0X01
         // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
         command.leftSpeed = readDate16(msg, 8);
+        command.rightSpeed = readDate16(msg, 24);      
         axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit  / 32768;  // 进行速度换算
-
-        command.rightSpeed = readDate16(msg, 24);
         axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit  / 32768;  // 进行速度换算
+        // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+        // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
         break;
 
     case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06
