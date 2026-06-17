@@ -1,5 +1,5 @@
 版本号：V0.5.6
-日期：  2026.4.27
+日期：  2026.6.11
 #擦除数据
 odrv0.erase_configuration()
 
@@ -19,7 +19,7 @@ odrv0.axis0.motor.config.current_control_bandwidth = 10
 odrv0.axis0.motor.config.current_lim = 20
 odrv0.axis0.motor.config.current_lim_margin = 20
 odrv0.axis0.motor.config.requested_current_range = 40
-odrv0.axis0.motor.config.torque_lim = 0.51
+odrv0.axis0.motor.config.torque_lim = 0.50
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 2
 odrv0.axis1.motor.config.calibration_current = 10
@@ -29,7 +29,7 @@ odrv0.axis1.motor.config.current_control_bandwidth = 10
 odrv0.axis1.motor.config.current_lim = 20
 odrv0.axis1.motor.config.current_lim_margin = 20
 odrv0.axis1.motor.config.requested_current_range = 40
-odrv0.axis1.motor.config.torque_lim = 0.46
+odrv0.axis1.motor.config.torque_lim = 0.50
 
 #M0编码器参数
 odrv0.axis0.encoder.config.mode = ENCODER_MODE_HALL
@@ -56,16 +56,19 @@ odrv0.axis1.controller.config.vel_gain = 0.025
 odrv0.axis1.controller.config.vel_integrator_gain =  0.10
 odrv0.axis1.controller.config.input_mode = INPUT_MODE_PASSTHROUGH
 odrv0.axis1.controller.config.vel_ramp_rate = 20
-#使用ODrivetool配置Can
+#配置Can
 odrv0.axis0.config.can_node_id = 0x001
 odrv0.axis1.config.can_node_id = 0x001
 odrv0.can.set_baud_rate(100000)
 
+#保存和重启
 odrv0.save_configuration()
 odrv0.reboot()
 
 #M0电机和编码器校准：
 odrv0.axis0.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE # 执行电机校准 + 编码器偏移校准
+
+odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE # 执行电机校准 + 编码器偏移校准
 
 odrv0.axis0.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis0.encoder.config.pre_calibrated=True#保存编码器自检
@@ -73,9 +76,6 @@ odrv0.axis0.config.startup_closed_loop_control=True#开机进入闭环
 odrv0.axis0.requested_state=AXIS_STATE_IDLE
 #odrv0.axis0.config.startup_encoder_offset_calibration =True#开机自检编码器，开机后自转
 odrv0.axis0.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
-
-odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE # 执行电机校准 + 编码器偏移校准
-
 odrv0.axis1.motor.config.pre_calibrated=True#保存电机自检
 odrv0.axis1.encoder.config.pre_calibrated=True#保存编码器自检
 odrv0.axis1.config.startup_closed_loop_control=True#开机进入闭环
@@ -84,7 +84,6 @@ odrv0.axis1.requested_state=AXIS_STATE_IDLE
 odrv0.axis1.encoder.config.ignore_illegal_hall_state = True    #检测到非法的霍尔状态不停止
 odrv0.save_configuration()
 odrv0.reboot()
-
 
 #查看并清除错误
 dump_errors(odrv0)
@@ -105,25 +104,18 @@ odrv0.config
 odrv0.axis0.encoder.config
 odrv0.axis1.encoder.config
 
-#电机电器参数查看
+#电机电气参数查看
 odrv0.axis0.motor.config
 odrv0.axis1.motor.config
 
 odrv0.axis0.encoder.hall_state#霍尔状态
 odrv0.axis1.encoder.hall_state#霍尔状态
 
-# 在绿板上手动设置黑板测得的参数，无需自检
-odrv0.axis0.motor.config.phase_resistance = 0.181
-odrv0.axis0.motor.config.phase_inductance = 0.000343
-odrv0.axis0.motor.config.pre_calibrated = True
-odrv0.axis1.motor.config.phase_resistance = 0.181
-odrv0.axis1.motor.config.phase_inductance = 0.000343
-odrv0.axis1.motor.config.pre_calibrated = True
-
+#设置电机转速
 odrv0.axis0.controller.input_vel = -50
 odrv0.axis1.controller.input_vel = -50
 
-
+#打印转速和电流
 import time
 for i in range(10000):
     vel0 = odrv0.axis0.encoder.vel_estimate
