@@ -86,10 +86,11 @@
 #define DRIVE_COMMAND0_START_STOP       0X04    //驱动器状态控制 第二个元素是1表示启动（进入速度闭环模式），2表示停止（进入空闲模式）
 #define DRIVE_COMMAND0_INQUIRY          0X05    //轮子在线问询   第二个元素是1表示z左电机 ，2表示右电机
 #define DRIVE_COMMAND0_GET_SPEED        0X06    //轮子转速问询   第二个元素是1表示z左电机 ，2表示右电机
-#define DRIVE_COMMAND0_PHASE_SEQUENCE   0X07    //设置电机相序   第二个元素是1表示z左电机 ，2表示右电机 （暂时不做这个功能）
+#define DRIVE_COMMAND0_READ_CURRENT     0X07    //电机电流读取
 #define DRIVE_COMMAND0_MOTOR_REVERSE    0X08    //设置电机转向   第二个元素是1表示z左电机 ，2表示右电机 第三个元素表示转向（0表示正转，1表示反转）
 #define DRIVE_COMMAND0_MOTOR_EXCHANGE   0X09    //暂时不做处理
 #define DRIVE_COMMAND0_AGEING_TEST      0X10    //暂时不做处理
+
 
 #define DRIVE_COMMAND0_BATTERY_VOLATILE 0X30    //暂时不做处理
 

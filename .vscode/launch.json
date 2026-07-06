@@ -44,6 +44,17 @@
             "interface": "swd",
             "serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
             "gdbPath": "D:\\Odrive051PATH\\gcc-arm-none-eabi-10.3-2021.10\\bin\\arm-none-eabi-gdb.exe"
+        },
+        {
+            "name": "LiteRun_Firmware",
+            "type": "cortex-debug",
+            "request": "launch",
+            "executable": "${workspaceRoot}/Firmware/build/LiteRunODrive-fw-v0.5.6.hex",
+            "servertype": "jlink",
+            "device": "STM32F405RG",
+            "interface": "swd",
+            "serverpath": "C:\\Program Files\\SEGGER\\JLink\\JLinkGDBServerCL.exe",
+            "gdbPath": "D:\\Odrive051PATH\\gcc-arm-none-eabi-10.3-2021.10\\bin\\arm-none-eabi-gdb.exe"
         }
     ]
 }

@@ -4,7 +4,7 @@
 
 #define USE_USER_CAN_CALLBACKS  1   // 使用自定义CAN回调函数
 #define ODRIVE_CUR_DEBUG        0   // 开启电流调试功能
-#define FILTER_DEPTH            100 // 滤波深度
+#define FILTER_DEPTH            20 // 滤波深度
 #define ODRIVE_CAN_TEST         0   // CAN测试功能开关
 
 // 定义静态成员变量
@@ -296,6 +296,44 @@ void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
     }
     odCAN->write(txmsg);
 }
+// 获取设备电流,
+void CANSimple::sendMotorCurrent(uint32_t can_id, uint8_t msg_id, uint8_t mode)
+{
+    can_Message_t txmsg;
+    txmsg.id = can_id;
+    txmsg.isExt = true;
+    txmsg.len = 8;
+    int16_t ibus;
+    int16_t m0_ibus;
+    int16_t m1_ibus;
+
+    if(mode){// 发送滤波后的电流值
+        ibus = (int16_t)(ibus_absoluteValue); // 毫安
+        m0_ibus = (int16_t)(m0_absoluteValue); // 毫安
+        m1_ibus = (int16_t)(m1_absoluteValue); // 毫安
+    }else {
+        ibus = (int16_t)(ibus_ * 1000.0f); // 毫安
+        m0_ibus = (int16_t)(axes[0]->motor_.current_control_.Iq_measured * 1000.0f); // 毫安
+        m1_ibus = (int16_t)(axes[1]->motor_.current_control_.Iq_measured * 1000.0f); // 毫安
+    }
+    txmsg.buf[0] = msg_id;
+    txmsg.buf[1] = mode;
+    txmsg.buf[2] = ibus >> 8;
+    txmsg.buf[3] = ibus;
+    txmsg.buf[4] = m0_ibus >> 8;
+    txmsg.buf[5] = m0_ibus;
+    txmsg.buf[6] = m1_ibus >> 8;
+    txmsg.buf[7] = m1_ibus;
+    odCAN->write(txmsg);
+}
+
+//上位机发送：001h 07 01 00 00 00 00 00 00
+//CAN_ID：001H ，包类型1Byte（请求电机电流：07）+ 电流模式1Byte（0：原始电流，1：滤波电流）+ 6Byte保留
+
+//驱动器返回：001h 07 01 00 00 00 00 00 00
+//CAN_ID：001H ，包类型1Byte（返回电机电流：07）+ 电流模式1Byte（0：原始电流，1：滤波电流）+ 总电流2Byte + 电机0电流2Byte + 电机1电流2Byte
+//电流单位为毫安，范围-32768~32767，一般情况下，电机电流不会超过12A，所以可以用int16_t表示。也会出现负数，-100MA以内，这个是正常的。
+
 
 // 设置电机电流阈值
 void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id,uint16_t rate_ms, uint16_t current_mA)
@@ -347,15 +385,16 @@ void CANSimple::set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velInte
 // 设置电机最大速度限制
 void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,uint16_t m1_max_speed)
 {
-    axes[0]->config_.max_speed_limit = m0_max_speed;
-    axes[1]->config_.max_speed_limit = m1_max_speed;
+    axes[0]->config_.max_speed_limit = m0_max_speed; // 转每分
+    axes[1]->config_.max_speed_limit = m1_max_speed; // 转每分
 
     get_motor_max_speed_limit(msg_id);//返回设置结果
     odrv.save_configuration();
     odrv.reboot();
 }
 
-
+// 在 can_simple.cpp 文件顶部添加
+#include "controller.hpp"  // 或者 MotorControl/controller.hpp
 void CANSimple::handle_can_message(can_Message_t& msg) {
 #if ODRIVE_CAN_TEST
     odCAN->write(msg);//返回接收到的数据
@@ -379,7 +418,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     case DRIVE_COMMAND0_SPEED:  // 轮子转速设置0X01
         // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
         command.leftSpeed = readDate16(msg, 8);
-        command.rightSpeed = readDate16(msg, 24);      
+        command.rightSpeed = readDate16(msg, 24);
         axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit  / 32768;  // 进行速度换算
         axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit  / 32768;  // 进行速度换算
         // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
@@ -403,6 +442,9 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                 sendMotorSpeed(axes[1], 0x13);
             }
         }
+        break;
+    case DRIVE_COMMAND0_READ_CURRENT:  // 电流读取
+            sendMotorCurrent(axes[0]->config_.can_node_id, command.cmd, readDate8(msg, 8));
         break;
     case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
         set_motor_current_threshold(readDate8(msg, 8),DRIVE__SET_CURRENT_THRESHOLD,readDate16(msg, 16),readDate16(msg, 32));
