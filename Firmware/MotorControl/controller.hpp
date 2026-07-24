@@ -7,7 +7,7 @@
 
 class Controller : public ODriveIntf::ControllerIntf {
 public:
-#if USER_CUSTOM_MOTOR_CODE_2
+#ifdef USER_CUSTOM_MOTOR_CODE_2
     void setStopFlag(uint8_t flag)
     {
         motorStopFlag = flag;

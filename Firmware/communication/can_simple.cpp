@@ -129,6 +129,9 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[3] = Speed >> 8;
         txmsg.buf[4] = Speed;
     }
+    if(txmsg.buf[0] != 0x09){
+        motor_current_fault(); //停止电机并关闭PWM输出
+    }
     odCAN->write(txmsg);  // 返回发送的数据
     return true;
 }

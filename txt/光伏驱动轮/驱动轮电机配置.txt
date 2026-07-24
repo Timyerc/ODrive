@@ -14,11 +14,11 @@ odrv0.config.max_regen_current = 0
 odrv0.axis0.motor.config.pole_pairs = 2
 odrv0.axis0.motor.config.calibration_current = 10
 odrv0.axis0.motor.config.resistance_calib_max_voltage = 10
-odrv0.axis0.motor.config.motor_type =0
+odrv0.axis0.motor.config.motor_type = 0
 odrv0.axis0.motor.config.current_control_bandwidth = 10
 odrv0.axis0.motor.config.current_lim = 20
 odrv0.axis0.motor.config.current_lim_margin = 20
-odrv0.axis0.motor.config.requested_current_range = 40
+odrv0.axis0.motor.config.requested_current_range = 90
 odrv0.axis0.motor.config.torque_lim = 0.51
 #M1电机参数
 odrv0.axis1.motor.config.pole_pairs = 2
@@ -28,7 +28,7 @@ odrv0.axis1.motor.config.motor_type =0
 odrv0.axis1.motor.config.current_control_bandwidth = 10
 odrv0.axis1.motor.config.current_lim = 20
 odrv0.axis1.motor.config.current_lim_margin = 20
-odrv0.axis1.motor.config.requested_current_range = 40
+odrv0.axis1.motor.config.requested_current_range = 90
 odrv0.axis1.motor.config.torque_lim = 0.46
 
 #M0编码器参数
