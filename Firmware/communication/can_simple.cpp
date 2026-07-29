@@ -1,26 +1,39 @@
 #include "can_simple.hpp"
+
 #include <odrive_main.h>
+
 #include <cstring>
 
-#define USE_USER_CAN_CALLBACKS  1   // 使用自定义CAN回调函数
-#define ODRIVE_CUR_DEBUG        0   // 开启电流调试功能
-#define FILTER_DEPTH            100 // 滤波深度
-#define ODRIVE_CAN_TEST         0   // CAN测试功能开关
+#define USE_USER_CAN_CALLBACKS 1  // 使用自定义CAN回调函数
+#define ODRIVE_CUR_DEBUG 0        // 开启电流调试功能
+#define FILTER_DEPTH 20           // 滤波深度
+#define ODRIVE_CAN_TEST 0         // CAN测试功能开关
 
 // 定义静态成员变量
 uint32_t CANSimple::alive = 0;
-
 
 static constexpr uint8_t NUM_NODE_ID_BITS = 6;
 static constexpr uint8_t NUM_CMD_ID_BITS = 11 - NUM_NODE_ID_BITS;
 
 #if USE_USER_CAN_CALLBACKS
+/**
+ * @brief Read an 8-bit value from a CAN payload.
+ * @param msg Source CAN frame.
+ * @param index Start bit offset in payload.
+ * @return Decoded 8-bit unsigned value.
+ */
 uint8_t CANSimple::readDate8(const can_Message_t& msg, uint8_t index) {
     uint8_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true);
     return data;
 }
 
+/**
+ * @brief Read a 16-bit big-endian value from a CAN payload.
+ * @param msg Source CAN frame.
+ * @param index Start bit offset of the high byte.
+ * @return Decoded 16-bit unsigned value.
+ */
 uint16_t CANSimple::readDate16(const can_Message_t& msg, uint8_t index) {
     uint16_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true) << 8;
@@ -28,6 +41,12 @@ uint16_t CANSimple::readDate16(const can_Message_t& msg, uint8_t index) {
     return data;
 }
 
+/**
+ * @brief Read a 32-bit big-endian value from a CAN payload.
+ * @param msg Source CAN frame.
+ * @param index Start bit offset of the highest byte.
+ * @return Decoded 32-bit unsigned value.
+ */
 uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index) {
     uint32_t data = 0;
     data = can_getSignal<uint8_t>(msg, index, 8, true) << 24;
@@ -37,7 +56,12 @@ uint32_t CANSimple::readDate32(const can_Message_t& msg, uint8_t index) {
     return data;
 }
 
-// 获取电机转速
+/**
+ * @brief Send motor speed and status frame for one axis.
+ * @param axis Axis to sample status and speed from.
+ * @param motorNum Extended CAN identifier used for reply.
+ * @return Always true after attempting frame transmission.
+ */
 bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     can_Message_t txmsg;
     int16_t Speed = 0;
@@ -61,42 +85,42 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
     //     txmsg.buf[2] = axis->motor_.user_error_ >> 16;
     //     txmsg.buf[3] = axis->motor_.user_error_ >> 8;
     //     txmsg.buf[4] = axis->motor_.user_error_ ;
-    // } else 
+    // } else
     if (axis->motor_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x08;  // 电机故障
         txmsg.buf[1] = axis->motor_.error_ >> 24;
         txmsg.buf[2] = axis->motor_.error_ >> 16;
         txmsg.buf[3] = axis->motor_.error_ >> 8;
-        txmsg.buf[4] = axis->motor_.error_ ;
+        txmsg.buf[4] = axis->motor_.error_;
     } else if (axis->encoder_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x05;  // 霍尔故障
         txmsg.buf[1] = axis->encoder_.error_ >> 24;
         txmsg.buf[2] = axis->encoder_.error_ >> 16;
         txmsg.buf[3] = axis->encoder_.error_ >> 8;
-        txmsg.buf[4] = axis->encoder_.error_ ;
+        txmsg.buf[4] = axis->encoder_.error_;
     } else if (axis->sensorless_estimator_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x03;  // 电机过流
         txmsg.buf[1] = axis->sensorless_estimator_.error_ >> 24;
         txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 16;
         txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 8;
-        txmsg.buf[4] = axis->sensorless_estimator_.error_ ;
+        txmsg.buf[4] = axis->sensorless_estimator_.error_;
     } else if (axis->controller_.error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x01;  //
         txmsg.buf[1] = axis->controller_.error_ >> 24;
         txmsg.buf[2] = axis->controller_.error_ >> 16;
         txmsg.buf[3] = axis->controller_.error_ >> 8;
-        txmsg.buf[4] = axis->controller_.error_ ;
+        txmsg.buf[4] = axis->controller_.error_;
     } else if (axis->error_) {
         txmsg.len = 5;
         txmsg.buf[0] = 0x02;  //
         txmsg.buf[1] = axis->error_ >> 24;
         txmsg.buf[2] = axis->error_ >> 16;
         txmsg.buf[3] = axis->error_ >> 8;
-        txmsg.buf[4] = axis->error_ ;
+        txmsg.buf[4] = axis->error_;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
@@ -105,24 +129,32 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[3] = Speed >> 8;
         txmsg.buf[4] = Speed;
     }
+    if(txmsg.buf[0] != 0x09){
+        motor_current_fault(); //停止电机并关闭PWM输出
+    }
     odCAN->write(txmsg);  // 返回发送的数据
     return true;
 }
 
 typedef struct
 {
-    uint16_t Countdown;//倒计时
-    uint16_t Iq_Num;//滤波计数
-    uint16_t index;//滤波索引
-    float Iq_Sum;//滤波和
-    float Iq_Filter[FILTER_DEPTH];//滤波数组
+    uint16_t Countdown;             // 倒计时
+    uint16_t Iq_Num;                // 滤波计数
+    uint16_t index;                 // 滤波索引
+    float Iq_Sum;                   // 滤波和
+    float Iq_Filter[FILTER_DEPTH];  // 滤波数组
 } Cur_Filter_t;
 
 Cur_Filter_t m0_Cur;
 Cur_Filter_t m1_Cur;
 Cur_Filter_t ibus;
 
-// 简单移动平均
+/**
+ * @brief Update moving-average filter and return filtered value.
+ * @param filter Filter state container.
+ * @param new_sample New sample value.
+ * @return Current moving-average output.
+ */
 float MovingAverage(Cur_Filter_t* filter, float new_sample) {
     filter->Iq_Sum -= filter->Iq_Filter[filter->index];
     filter->Iq_Sum += new_sample;
@@ -132,42 +164,48 @@ float MovingAverage(Cur_Filter_t* filter, float new_sample) {
     return filter->Iq_Sum / FILTER_DEPTH;
 }
 
-// 电流过载故障处理
+/**
+ * @brief Stop both motors and disable PWM after over-current fault.
+ */
 void CANSimple::motor_current_fault(void) {
-    axes[0]->controller_.input_vel_ = 0;// 速度清零
-    axes[0]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
-    axes[1]->controller_.input_vel_ = 0;// 速度清零
-    axes[1]->motor_.current_control_.Iq_measured = 0.0f;// 测量电流清零
-    safety_critical_disarm_motor_pwm(axes[0]->motor_);// 关闭PWM输出
-    safety_critical_disarm_motor_pwm(axes[1]->motor_);// 关闭PWM输出
+    axes[0]->controller_.input_vel_ = 0;                  // 速度清零
+    axes[0]->motor_.current_control_.Iq_measured = 0.0f;  // 测量电流清零
+    axes[1]->controller_.input_vel_ = 0;                  // 速度清零
+    axes[1]->motor_.current_control_.Iq_measured = 0.0f;  // 测量电流清零
+    safety_critical_disarm_motor_pwm(axes[0]->motor_);    // 关闭PWM输出
+    safety_critical_disarm_motor_pwm(axes[1]->motor_);    // 关闭PWM输出
 }
 
-//霍尔状态检测
+/**
+ * @brief Check Hall sensor legality and set user errors when invalid.
+ */
 void CANSimple::hall_error_handing(void) {
-    if(axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
-        axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;//进入空闲状态
-        axes[0]->motor_.user_error_ |= ERROR_M0_ILLEGAL_HALL;// 设置霍尔错误标志
+    if (axes[0]->encoder_.hall_state_ == 0 || axes[0]->encoder_.hall_state_ == 7) {
+        axes[0]->requested_state_ = Axis::AXIS_STATE_IDLE;     // 进入空闲状态
+        axes[0]->motor_.user_error_ |= ERROR_M0_ILLEGAL_HALL;  // 设置霍尔错误标志
     }
 
-    if(axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
-        axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;//进入空闲状态
-        axes[1]->motor_.user_error_ |= ERROR_M1_ILLEGAL_HALL;// 设置霍尔错误标志
+    if (axes[1]->encoder_.hall_state_ == 0 || axes[1]->encoder_.hall_state_ == 7) {
+        axes[1]->requested_state_ = Axis::AXIS_STATE_IDLE;     // 进入空闲状态
+        axes[1]->motor_.user_error_ |= ERROR_M1_ILLEGAL_HALL;  // 设置霍尔错误标志
     }
 }
 
-//热插拔错误处理
+/**
+ * @brief Try to recover from Hall hot-plug faults when state becomes valid.
+ */
 void CANSimple::hot_plugging_error_handing(void) {
-    if(axes[0]->motor_.user_error_ & ERROR_M0_ILLEGAL_HALL) {
+    if (axes[0]->motor_.user_error_ & ERROR_M0_ILLEGAL_HALL) {
         // 通过清除错误并重新进入闭环控制尝试恢复
-        if(axes[0]->encoder_.hall_state_ != 0 && axes[0]->encoder_.hall_state_ != 7) {
+        if (axes[0]->encoder_.hall_state_ != 0 && axes[0]->encoder_.hall_state_ != 7) {
             axes[0]->clear_errors();
             axes[0]->controller_.input_vel_ = 0;
             axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
             axes[0]->motor_.user_error_ = 0;
         }
     }
-    if(axes[1]->motor_.user_error_ & ERROR_M1_ILLEGAL_HALL) {
-        if(axes[1]->encoder_.hall_state_ != 0 && axes[1]->encoder_.hall_state_ != 7) {
+    if (axes[1]->motor_.user_error_ & ERROR_M1_ILLEGAL_HALL) {
+        if (axes[1]->encoder_.hall_state_ != 0 && axes[1]->encoder_.hall_state_ != 7) {
             // 通过清除错误并重新进入闭环控制尝试恢复
             axes[1]->clear_errors();
             axes[1]->controller_.input_vel_ = 0;
@@ -177,44 +215,46 @@ void CANSimple::hot_plugging_error_handing(void) {
     }
 }
 
-int32_t m0_absoluteValue; // 毫安
-int32_t m1_absoluteValue; // 毫安
-int32_t ibus_absoluteValue; // 毫安
-//电流过载保护输出
+int32_t m0_absoluteValue;    // 毫安
+int32_t m1_absoluteValue;    // 毫安
+int32_t ibus_absoluteValue;  // 毫安
+/**
+ * @brief Execute filtered current protection and set over-current errors.
+ */
 void CANSimple::motor_overload_output(void) {
-    //int32_t m0_absoluteValue = (int32_t)(axes[0]->motor_.current_control_.Ibus * 1000.0f); // 毫安
-    //int32_t m1_absoluteValue = (int32_t)(axes[1]->motor_.current_control_.Ibus * 1000.0f); // 毫安
-    m0_absoluteValue = (int32_t)(MovingAverage(&m0_Cur,  axes[0]->motor_.current_control_.Ibus) * 1000.0f); // 毫安
-    m1_absoluteValue = (int32_t)(MovingAverage(&m1_Cur,  axes[1]->motor_.current_control_.Ibus) * 1000.0f); // 毫安
-    ibus_absoluteValue = (int32_t)(MovingAverage(&ibus,  ibus_) * 1000.0f); // 毫安
-    if(m0_absoluteValue > axes[0]->config_.current_threshold_mA) {//过流保护
+    // int32_t m0_absoluteValue = (int32_t)(axes[0]->motor_.current_control_.Ibus * 1000.0f); // 毫安
+    // int32_t m1_absoluteValue = (int32_t)(axes[1]->motor_.current_control_.Ibus * 1000.0f); // 毫安
+    m0_absoluteValue = (int32_t)(MovingAverage(&m0_Cur, axes[0]->motor_.current_control_.Ibus) * 1000.0f);  // 毫安
+    m1_absoluteValue = (int32_t)(MovingAverage(&m1_Cur, axes[1]->motor_.current_control_.Ibus) * 1000.0f);  // 毫安
+    ibus_absoluteValue = (int32_t)(MovingAverage(&ibus, ibus_) * 1000.0f);                                  // 毫安
+    if (m0_absoluteValue > axes[0]->config_.current_threshold_mA) {                                         // 过流保护
         m0_Cur.Countdown++;
-        if(m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) { //持续3秒以上
-            motor_current_fault();//关闭所有电机PWM输出
-            axes[0]->motor_.user_error_ |= ERROR_M0_OVER_CURRENT;// 设置用户过流错误标志
+        if (m0_Cur.Countdown >= axes[0]->config_.heartbeat_rate_ms) {  // 持续3秒以上
+            motor_current_fault();                                     // 关闭所有电机PWM输出
+            axes[0]->motor_.user_error_ |= ERROR_M0_OVER_CURRENT;      // 设置用户过流错误标志
         }
     } else {
-        m0_Cur.Countdown = 0;// 复位计数
+        m0_Cur.Countdown = 0;  // 复位计数
     }
 
-    if(m1_absoluteValue > axes[1]->config_.current_threshold_mA) {//过流保护
+    if (m1_absoluteValue > axes[1]->config_.current_threshold_mA) {  // 过流保护
         m1_Cur.Countdown++;
-        if(m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) { //持续3秒以上
-            motor_current_fault();//关闭所有电机PWM输出
-            axes[1]->motor_.user_error_ |= ERROR_M1_OVER_CURRENT;// 设置用户过流错误标志
+        if (m1_Cur.Countdown >= axes[1]->config_.heartbeat_rate_ms) {  // 持续3秒以上
+            motor_current_fault();                                     // 关闭所有电机PWM输出
+            axes[1]->motor_.user_error_ |= ERROR_M1_OVER_CURRENT;      // 设置用户过流错误标志
         }
     } else {
-        m1_Cur.Countdown = 0;// 复位计数
+        m1_Cur.Countdown = 0;  // 复位计数
     }
 #if ODRIVE_CUR_DEBUG
     can_Message_t txmsg;
     txmsg.id = 0x30;
     txmsg.isExt = true;
     txmsg.len = 8;
-    if(m1_absoluteValue > axes[1]->config_.current_threshold_mA || m0_absoluteValue > axes[0]->config_.current_threshold_mA) {
+    if (m1_absoluteValue > axes[1]->config_.current_threshold_mA || m0_absoluteValue > axes[0]->config_.current_threshold_mA) {
         m0_absoluteValue = 4000;
     }
-    if(error_) {
+    if (error_) {
         m1_absoluteValue = 0;
         m0_absoluteValue = 0;
     }
@@ -245,7 +285,10 @@ void CANSimple::motor_overload_output(void) {
 #endif
 }
 
-// 保活任务
+/**
+ * @brief Periodic keepalive task with timeout and protection hooks.
+ * @param axis Current axis context, used for optional test heartbeat.
+ */
 void CANSimple::keepAlive(Axis* axis) {
     alive++;
     if (alive >= 0x10) {  // 大约1秒没有收到控制指令，停止电机
@@ -253,9 +296,9 @@ void CANSimple::keepAlive(Axis* axis) {
         axes[1]->controller_.input_vel_ = 0;
         alive = 0;
     }
-    motor_overload_output();//电流过载保护输出
-    hall_error_handing();//霍尔状态检测
-    hot_plugging_error_handing();//热插拔错误
+    motor_overload_output();       // 电流过载保护输出
+    hall_error_handing();          // 霍尔状态检测
+    hot_plugging_error_handing();  // 热插拔错误
 #if ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
@@ -267,14 +310,17 @@ void CANSimple::keepAlive(Axis* axis) {
     txmsg.buf[0] = alive >> 24;
     txmsg.buf[1] = alive >> 16;
     txmsg.buf[2] = alive >> 8;
-    txmsg.buf[3] = alive ;
+    txmsg.buf[3] = alive;
     odCAN->write(txmsg);
 #endif
 }
 
-// 获取电机电流阈值
-void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
-{
+/**
+ * @brief Query configured current-threshold parameters for one motor.
+ * @param motorNum Motor index (0 or 1).
+ * @param msg_id Application-level command id echoed in response.
+ */
+void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id) {
     can_Message_t txmsg;
     txmsg.id = 0x01;
     txmsg.isExt = true;
@@ -282,13 +328,12 @@ void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
 
     txmsg.buf[0] = msg_id;
     txmsg.buf[1] = motorNum;
-    if(motorNum == 0x0) {//获取两个电机的电流阈值
+    if (motorNum == 0x0) {  // 获取两个电机的电流阈值
         txmsg.buf[2] = axes[0]->config_.heartbeat_rate_ms >> 8;
         txmsg.buf[3] = axes[0]->config_.heartbeat_rate_ms;
         txmsg.buf[4] = axes[0]->config_.current_threshold_mA >> 8;
         txmsg.buf[5] = axes[0]->config_.current_threshold_mA;
-    }
-    else if(motorNum == 0x1) {//获取单个电机的电流阈值
+    } else if (motorNum == 0x1) {  // 获取单个电机的电流阈值
         txmsg.buf[2] = axes[1]->config_.heartbeat_rate_ms >> 8;
         txmsg.buf[3] = axes[1]->config_.heartbeat_rate_ms;
         txmsg.buf[4] = axes[1]->config_.current_threshold_mA >> 8;
@@ -296,27 +341,74 @@ void CANSimple::get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id)
     }
     odCAN->write(txmsg);
 }
+/**
+ * @brief Send total and per-motor current feedback.
+ * @param can_id Extended CAN id used for response.
+ * @param msg_id Application-level command id.
+ * @param mode 0: raw current, 1: filtered current.
+ */
+void CANSimple::sendMotorCurrent(uint32_t can_id, uint8_t msg_id, uint8_t mode) {
+    can_Message_t txmsg;
+    txmsg.id = can_id;
+    txmsg.isExt = true;
+    txmsg.len = 8;
+    int16_t ibus;
+    int16_t m0_ibus;
+    int16_t m1_ibus;
 
-// 设置电机电流阈值
-void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id,uint16_t rate_ms, uint16_t current_mA)
-{
-    if(current_mA < 100 || rate_ms < 1 || motorNum > 1) return; //最小100毫安，最小100ms
-    if(motorNum == 0x0) {//设置电机0的电流阈值
+    if (mode) {                                 // 发送滤波后的电流值
+        ibus = (int16_t)(ibus_absoluteValue);   // 毫安
+        m0_ibus = (int16_t)(m0_absoluteValue);  // 毫安
+        m1_ibus = (int16_t)(m1_absoluteValue);  // 毫安
+    } else {
+        ibus = (int16_t)(ibus_ * 1000.0f);                                            // 毫安
+        m0_ibus = (int16_t)(axes[0]->motor_.current_control_.Iq_measured * 1000.0f);  // 毫安
+        m1_ibus = (int16_t)(axes[1]->motor_.current_control_.Iq_measured * 1000.0f);  // 毫安
+    }
+    txmsg.buf[0] = msg_id;
+    txmsg.buf[1] = mode;
+    txmsg.buf[2] = ibus >> 8;
+    txmsg.buf[3] = ibus;
+    txmsg.buf[4] = m0_ibus >> 8;
+    txmsg.buf[5] = m0_ibus;
+    txmsg.buf[6] = m1_ibus >> 8;
+    txmsg.buf[7] = m1_ibus;
+    odCAN->write(txmsg);
+}
+
+// 上位机发送：001h 07 01 00 00 00 00 00 00
+// CAN_ID：001H ，包类型1Byte（请求电机电流：07）+ 电流模式1Byte（0：原始电流，1：滤波电流）+ 6Byte保留
+
+// 驱动器返回：001h 07 01 00 00 00 00 00 00
+// CAN_ID：001H ，包类型1Byte（返回电机电流：07）+ 电流模式1Byte（0：原始电流，1：滤波电流）+ 总电流2Byte + 电机0电流2Byte + 电机1电流2Byte
+// 电流单位为毫安，范围-32768~32767，一般情况下，电机电流不会超过12A，所以可以用int16_t表示。也会出现负数，-100MA以内，这个是正常的。
+
+/**
+ * @brief Set current-threshold protection parameters for one motor.
+ * @param motorNum Motor index (0 or 1).
+ * @param msg_id Application-level command id for response.
+ * @param rate_ms Threshold duration in milliseconds.
+ * @param current_mA Current threshold in mA.
+ */
+void CANSimple::set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t rate_ms, uint16_t current_mA) {
+    if (current_mA < 100 || rate_ms < 1 || motorNum > 1) return;  // 最小100毫安，最小100ms
+    if (motorNum == 0x0) {                                        // 设置电机0的电流阈值
         axes[0]->config_.heartbeat_rate_ms = rate_ms;
         axes[0]->config_.current_threshold_mA = current_mA;
-    }
-    else if(motorNum == 0x1) {//设置电机1的电流阈值
+    } else if (motorNum == 0x1) {  // 设置电机1的电流阈值
         axes[1]->config_.heartbeat_rate_ms = rate_ms;
         axes[1]->config_.current_threshold_mA = current_mA;
     }
-    get_motor_current_threshold(motorNum, msg_id);//返回设置结果
+    get_motor_current_threshold(motorNum, msg_id);  // 返回设置结果
     odrv.save_configuration();
     odrv.reboot();
 }
 
-// 获取电机最大速度限制
-void CANSimple::get_motor_max_speed_limit(uint8_t msg_id)
-{
+/**
+ * @brief Get configured maximum speed limits for both motors.
+ * @param msg_id Application-level command id echoed in response.
+ */
+void CANSimple::get_motor_max_speed_limit(uint8_t msg_id) {
     can_Message_t txmsg;
     txmsg.id = 0x01;
     txmsg.isExt = true;
@@ -331,9 +423,13 @@ void CANSimple::get_motor_max_speed_limit(uint8_t msg_id)
     odCAN->write(txmsg);
 }
 
-// 设置电机速度环pid参数
-void CANSimple::set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velIntegratorGain)
-{
+/**
+ * @brief Update velocity-loop PID gains.
+ * @param id Motor index (0 or 1).
+ * @param velGain Velocity proportional gain scaled by 1/1000.
+ * @param velIntegratorGain Velocity integrator gain scaled by 1/1000.
+ */
+void CANSimple::set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velIntegratorGain) {
     if (id == 0) {
         axes[0]->controller_.config_.vel_gain = (float)velGain / 1000;
         axes[0]->controller_.config_.vel_integrator_gain = (float)velIntegratorGain / 1000;
@@ -344,28 +440,36 @@ void CANSimple::set_motor_vel_pid(uint8_t id, uint16_t velGain, uint16_t velInte
     odrv.save_configuration();
 }
 
-// 设置电机最大速度限制
-void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,uint16_t m1_max_speed)
-{
-    axes[0]->config_.max_speed_limit = m0_max_speed;
-    axes[1]->config_.max_speed_limit = m1_max_speed;
+/**
+ * @brief Set maximum speed limits for both motors.
+ * @param msg_id Application-level command id for response.
+ * @param m0_max_speed Motor 0 max speed in RPM.
+ * @param m1_max_speed Motor 1 max speed in RPM.
+ */
+void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed, uint16_t m1_max_speed) {
+    axes[0]->config_.max_speed_limit = m0_max_speed;  // 转每分
+    axes[1]->config_.max_speed_limit = m1_max_speed;  // 转每分
 
-    get_motor_max_speed_limit(msg_id);//返回设置结果
+    get_motor_max_speed_limit(msg_id);  // 返回设置结果
     odrv.save_configuration();
     odrv.reboot();
 }
 
-
+#include "controller.hpp"  // 或者 MotorControl/controller.hpp
+/**
+ * @brief Parse and dispatch custom CAN application commands.
+ * @param msg Incoming CAN frame.
+ */
 void CANSimple::handle_can_message(can_Message_t& msg) {
 #if ODRIVE_CAN_TEST
-    odCAN->write(msg);//返回接收到的数据
+    odCAN->write(msg);  // 返回接收到的数据
 #endif
 
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
-        alive = 0;  // 收到消息，清零保活计数
-    }else if(msg.id == 0x123){//debug
+        alive = 0;                 // 收到消息，清零保活计数
+    } else if (msg.id == 0x123) {  // debug
         odrive_debug(msg);
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
@@ -376,69 +480,71 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     canMessage_t command;
     command.cmd = readDate8(msg, 0);
     switch (command.cmd) {
-    case DRIVE_COMMAND0_SPEED:  // 轮子转速设置0X01
-        // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
-        command.leftSpeed = readDate16(msg, 8);
-        command.rightSpeed = readDate16(msg, 24);      
-        axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit  / 32768;  // 进行速度换算
-        axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit  / 32768;  // 进行速度换算
-        // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
-        // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
-        break;
+        case DRIVE_COMMAND0_SPEED:  // 轮子转速设置0X01
+            // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
+            command.leftSpeed = readDate16(msg, 8);
+            command.rightSpeed = readDate16(msg, 24);
+            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit / 32768;   // 进行速度换算
+            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit / 32768;  // 进行速度换算
+            // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+            // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+            break;
 
-    case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06
-        command.SpeedRequst = readDate8(msg, 8);
+        case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06
+            command.SpeedRequst = readDate8(msg, 8);
 
-        if (axes[0]->config_.can_node_id == 0x01) {  // 行走轮
-            if (command.SpeedRequst == 0x01) {  // 左轮
-                sendMotorSpeed(axes[0], 0x02);
-            } else if (command.SpeedRequst == 0x02) {  // 右轮
-                sendMotorSpeed(axes[1], 0x03);
+            if (axes[0]->config_.can_node_id == 0x01) {  // 行走轮
+                if (command.SpeedRequst == 0x01) {       // 左轮
+                    sendMotorSpeed(axes[0], 0x02);
+                } else if (command.SpeedRequst == 0x02) {  // 右轮
+                    sendMotorSpeed(axes[1], 0x03);
+                }
             }
-        }
-        if (axes[0]->config_.can_node_id == 0x10) {  // 毛刷
-            if (command.SpeedRequst == 0x01) {            // 左毛刷
-                sendMotorSpeed(axes[0], 0x12);
-            } else if (command.SpeedRequst == 0x02) {  // 右毛刷
-                sendMotorSpeed(axes[1], 0x13);
+            if (axes[0]->config_.can_node_id == 0x10) {  // 毛刷
+                if (command.SpeedRequst == 0x01) {       // 左毛刷
+                    sendMotorSpeed(axes[0], 0x12);
+                } else if (command.SpeedRequst == 0x02) {  // 右毛刷
+                    sendMotorSpeed(axes[1], 0x13);
+                }
             }
-        }
-        break;
-    case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
-        set_motor_current_threshold(readDate8(msg, 8),DRIVE__SET_CURRENT_THRESHOLD,readDate16(msg, 16),readDate16(msg, 32));
-        break;
-    case DRIVE__GET_CURRENT_THRESHOLD:  // 获取电机电流阈值
-        get_motor_current_threshold(readDate8(msg, 8),DRIVE__GET_CURRENT_THRESHOLD);
-        break;
-    case DRIVE__SET_MAX_SPEED_LIMIT:  // 设置电机最大速度限制
-        set_motor_max_speed_limit(DRIVE__SET_MAX_SPEED_LIMIT,readDate16(msg, 8),readDate16(msg, 24));
-        break;
-    case DRIVE__GET_MAX_SPEED_LIMIT:  // 获取电机最大速度限制
-        get_motor_max_speed_limit(DRIVE__GET_MAX_SPEED_LIMIT);
-        break;
-    case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
-        if(!readDate16(msg, 16)) {
-            clear_errors_callback(axes[0], msg);
-            axes[0]->controller_.input_vel_ = 0;
-            axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            axes[0]->motor_.user_error_ = 0;
-        }
-        else {
-            clear_errors_callback(axes[1], msg);
-            axes[1]->controller_.input_vel_ = 0;
-            axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
-            axes[1]->motor_.user_error_ = 0;
-        }
-        break;
-    case DRIVE__SET_VEL_PID:
-        set_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
-        break;
-    case DRIVE_RESTART:  // 重新启动
-        odrv.reboot();
-        break;
+            break;
+        case DRIVE_COMMAND0_READ_CURRENT:  // 电流读取
+            sendMotorCurrent(axes[0]->config_.can_node_id, command.cmd, readDate8(msg, 8));
+            break;
+        case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
+            set_motor_current_threshold(readDate8(msg, 8), DRIVE__SET_CURRENT_THRESHOLD, readDate16(msg, 16), readDate16(msg, 32));
+            break;
+        case DRIVE__GET_CURRENT_THRESHOLD:  // 获取电机电流阈值
+            get_motor_current_threshold(readDate8(msg, 8), DRIVE__GET_CURRENT_THRESHOLD);
+            break;
+        case DRIVE__SET_MAX_SPEED_LIMIT:  // 设置电机最大速度限制
+            set_motor_max_speed_limit(DRIVE__SET_MAX_SPEED_LIMIT, readDate16(msg, 8), readDate16(msg, 24));
+            break;
+        case DRIVE__GET_MAX_SPEED_LIMIT:  // 获取电机最大速度限制
+            get_motor_max_speed_limit(DRIVE__GET_MAX_SPEED_LIMIT);
+            break;
+        case DRIVE_CLEAR_ERRORS:  // 异常状态清除并重新进入闭环模式
+            if (!readDate16(msg, 16)) {
+                clear_errors_callback(axes[0], msg);
+                axes[0]->controller_.input_vel_ = 0;
+                axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+                axes[0]->motor_.user_error_ = 0;
+            } else {
+                clear_errors_callback(axes[1], msg);
+                axes[1]->controller_.input_vel_ = 0;
+                axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+                axes[1]->motor_.user_error_ = 0;
+            }
+            break;
+        case DRIVE__SET_VEL_PID:
+            set_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
+            break;
+        case DRIVE_RESTART:  // 重新启动
+            odrv.reboot();
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
 }
 #else
@@ -556,8 +662,8 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             clear_errors_callback(axis, msg);
             break;
 #endif
-        default:
-            break;
+            default:
+                break;
         }
     }
 }

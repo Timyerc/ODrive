@@ -86,10 +86,11 @@
 #define DRIVE_COMMAND0_START_STOP       0X04    //驱动器状态控制 第二个元素是1表示启动（进入速度闭环模式），2表示停止（进入空闲模式）
 #define DRIVE_COMMAND0_INQUIRY          0X05    //轮子在线问询   第二个元素是1表示z左电机 ，2表示右电机
 #define DRIVE_COMMAND0_GET_SPEED        0X06    //轮子转速问询   第二个元素是1表示z左电机 ，2表示右电机
-#define DRIVE_COMMAND0_PHASE_SEQUENCE   0X07    //设置电机相序   第二个元素是1表示z左电机 ，2表示右电机 （暂时不做这个功能）
+#define DRIVE_COMMAND0_READ_CURRENT     0X07    //电机电流读取
 #define DRIVE_COMMAND0_MOTOR_REVERSE    0X08    //设置电机转向   第二个元素是1表示z左电机 ，2表示右电机 第三个元素表示转向（0表示正转，1表示反转）
 #define DRIVE_COMMAND0_MOTOR_EXCHANGE   0X09    //暂时不做处理
 #define DRIVE_COMMAND0_AGEING_TEST      0X10    //暂时不做处理
+
 
 #define DRIVE_COMMAND0_BATTERY_VOLATILE 0X30    //暂时不做处理
 
@@ -100,23 +101,19 @@
 #define DRIVE_COMMAND0_GET_EXCHANGE     0XE3    //暂时不做处理
 
 typedef enum {
-    DRIVE_CLEAR_ERRORS            = 0xC0,                //电机错误状态清除
+    DRIVE_CLEAR_ERRORS            = 0xC0,      //电机错误状态清除
+    // DRIVE_MOTOR_CALIBRATION    = 0xC1,      //电机校准
+    // DRIVE_ENCODER_CALIBRATION  = 0xC2,      //编码器校准
+    // DRIVE_CLOSED_LOOP_CONTROL  = 0xC3,      //进入闭环模式
+    // DRIVE_IDLE_MODE            = 0xC4,      //进入空闲模式
     DRIVE__SET_CURRENT_THRESHOLD  = 0xCA,      //设置电机过载电流阈值
     DRIVE__GET_CURRENT_THRESHOLD  = 0xCB,      //获取电机过载电流阈值
     DRIVE__SET_MAX_SPEED_LIMIT    = 0xCC,      //设置电机最大速度限制
     DRIVE__GET_MAX_SPEED_LIMIT    = 0xCD,      //获取电机最大速度限制
     DRIVE__SET_VEL_PID            = 0xCE,      //设置电机速度环PID参数
-    // DRIVE_MOTOR_CALIBRATION = 0xCC,           //电机校准
-    // DRIVE_ENCODER_OFFSET_CALIBRATION = 0xCD,  //编码器校准
-    // DRIVE_CLOSED_LOOP_CONTROL = 0xCE,         //进入闭环模式
-    // DRIVE_IDLE_MODE = 0xCF,                   //进入空闲模式
-    DRIVE_RESTART = 0xCF,                     //重新启动
+    DRIVE_RESTART                 = 0xCF,      //重新启动
 } DRIVE_CMD_ENUM;
-// #define DRIVE_CLEAR_ERRORS                0xC0  //电机错误状态清除
-// #define DRIVE_MOTOR_CALIBRATION           0xCC  //电机校准
-// #define DRIVE_ENCODER_OFFSET_CALIBRATION  0xCD  //编码器校准
-// #define DRIVE_CLOSED_LOOP_CONTROL         0xCE  //进入闭环模式
-// #define DRIVE_IDLE_MODE                   0xCF  //进入空闲模式
+
 // recve cmd end
 /* USER CODE END Includes */
 

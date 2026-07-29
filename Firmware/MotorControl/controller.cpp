@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-#if USER_CUSTOM_MOTOR_CODE_2
+#ifdef USER_CUSTOM_MOTOR_CODE_2
     uint8_t motorStopFlag = 0;
 #endif
 
@@ -302,7 +302,7 @@ bool Controller::update(float* torque_setpoint_output) {
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
-#if USER_CUSTOM_MOTOR_CODE_1
+#ifdef USER_CUSTOM_MOTOR_CODE_1
 /*防抖动：目标速度后反馈都为零的时候*/
         if (input_vel_ != 0 && this->getStopFlag() == 0) {
             this->setStopFlag(1);

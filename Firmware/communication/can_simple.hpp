@@ -58,6 +58,7 @@ class CANSimple {
     static void hot_plugging_error_handing(void);
     static void motor_overload_output(void);
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
+    static void sendMotorCurrent(uint32_t can_id, uint8_t msg_id, uint8_t mode);
     static void set_motor_current_threshold(uint8_t motorNum, uint8_t msg_id, uint16_t current_mA ,uint16_t rate_ms);
     static void get_motor_max_speed_limit(uint8_t msg_id);
     static void set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed, uint16_t m1_max_speed);

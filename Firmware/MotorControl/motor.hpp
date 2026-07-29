@@ -1,83 +1,85 @@
 #ifndef __MOTOR_HPP
 #define __MOTOR_HPP
 
-#define USER_CUSTOM_MOTOR_CODE_1 1 //解决电机抖动问题：当目标速度和反馈速度都为零时，设置一个停止标志位，禁止电机输出，直到下次目标速度不为零时才允许输出。
-#define USER_CUSTOM_MOTOR_CODE_2 1 //增加一个接口，允许外部代码设置和获取这个停止标志位，以便在其他地方也能控制电机的输出。
-#define USER_CUSTOM_MOTOR_CODE_3 1 //在电流限制检查和电流控制计算中使用测量的电流值而不是滤波后的值，以实现更快的过流保护和更直接的电流控制。
-
+// #define USER_CUSTOM_MOTOR_CODE_1  // 解决电机抖动问题：当目标速度和反馈速度都为零时，设置一个停止标志位，禁止电机输出，直到下次目标速度不为零时才允许输出。
+// #define USER_CUSTOM_MOTOR_CODE_2  // 增加一个接口，允许外部代码设置和获取这个停止标志位，以便在其他地方也能控制电机的输出。
+#define USER_CUSTOM_MOTOR_CODE_3  // 在电流限制检查和电流控制计算中使用测量的电流值而不是滤波后的值，以实现更快的过流保护和更直接的电流控制。
+#define USER_CUSTOM_MOTOR_CODE_4  // B\C相电流的测量值使用滤波后的值，而不是原始的ADC采样值，以减少噪声对电流控制的影响。
 
 #ifndef __ODRIVE_MAIN_H
 #error "This file should not be included directly. Include odrive_main.h instead."
 #endif
 
 #include "drv8301.h"
-#if USER_CUSTOM_MOTOR_CODE_2
+#ifdef USER_CUSTOM_MOTOR_CODE_2
 extern uint8_t motorStopFlag;
 #endif
 class Motor : public ODriveIntf::MotorIntf {
-public:
-#if USER_CUSTOM_MOTOR_CODE_2
-    void setStopFlag(uint8_t flag)
-    {
+   public:
+#ifdef USER_CUSTOM_MOTOR_CODE_2
+    void setStopFlag(uint8_t flag) {
         motorStopFlag = flag;
     }
-    uint8_t getStopFlag(void)
-    {
+    uint8_t getStopFlag(void) {
         return motorStopFlag;
     }
 #endif
     struct Iph_BC_t {
         float phB;
         float phC;
+#ifdef USER_CUSTOM_MOTOR_CODE_4
+        float phB_filtered;
+        float phC_filtered;
+#endif
     };
 
-    struct CurrentControl_t{
-        float p_gain; // [V/A]
-        float i_gain; // [V/As]
-        float v_current_control_integral_d; // [V]
-        float v_current_control_integral_q; // [V]
-        float Ibus; // DC bus current [A]
+    struct CurrentControl_t {
+        float p_gain;                        // [V/A]
+        float i_gain;                        // [V/As]
+        float v_current_control_integral_d;  // [V]
+        float v_current_control_integral_q;  // [V]
+        float Ibus;                          // DC bus current [A]
         // Voltage applied at end of cycle:
-        float final_v_alpha; // [V]
-        float final_v_beta; // [V]
-        float Id_setpoint; // [A]
-        float Iq_setpoint; // [A]
-        float Iq_measured; // [A]
-        float Id_measured; // [A]
+        float final_v_alpha;  // [V]
+        float final_v_beta;   // [V]
+        float Id_setpoint;    // [A]
+        float Iq_setpoint;    // [A]
+        float Iq_measured;    // [A]
+        float Id_measured;    // [A]
         float I_measured_report_filter_k;
-        float max_allowed_current; // [A]
-        float overcurrent_trip_level; // [A]
-        float acim_rotor_flux; // [A]
-        float async_phase_vel; // [rad/s electrical]
-        float async_phase_offset; // [rad electrical]
+        float max_allowed_current;     // [A]
+        float overcurrent_trip_level;  // [A]
+        float acim_rotor_flux;         // [A]
+        float async_phase_vel;         // [rad/s electrical]
+        float async_phase_offset;      // [rad electrical]
     };
 
     // NOTE: for gimbal motors, all units of Nm are instead V.
     // example: vel_gain is [V/(turn/s)] instead of [Nm/(turn/s)]
     // example: current_lim and calibration_current will instead determine the maximum voltage applied to the motor.
     struct Config_t {
-        bool pre_calibrated = false; // can be set to true to indicate that all values here are valid
+        bool pre_calibrated = false;  // can be set to true to indicate that all values here are valid
         int32_t pole_pairs = 7;
-        float calibration_current = 10.0f;    // [A]
-        float resistance_calib_max_voltage = 2.0f; // [V] - You may need to increase this if this voltage isn't sufficient to drive calibration_current through the motor.
-        float phase_inductance = 0.0f;        // to be set by measure_phase_inductance
-        float phase_resistance = 0.0f;        // to be set by measure_phase_resistance
-        float torque_constant = 0.04f;         // [Nm/A] for PM motors, [Nm/A^2] for induction motors. Equal to 8.27/Kv of the motor
-        int32_t direction = 0;                // 1 or -1 (0 = unspecified)
+        float calibration_current = 10.0f;          // [A]
+        float resistance_calib_max_voltage = 2.0f;  // [V] - You may need to increase this if this voltage isn't sufficient to drive calibration_current through the motor.
+        float phase_inductance = 0.0f;              // to be set by measure_phase_inductance
+        float phase_resistance = 0.0f;              // to be set by measure_phase_resistance
+        float torque_constant = 0.04f;              // [Nm/A] for PM motors, [Nm/A^2] for induction motors. Equal to 8.27/Kv of the motor
+        int32_t direction = 0;                      // 1 or -1 (0 = unspecified)
         MotorType motor_type = MOTOR_TYPE_HIGH_CURRENT;
         // Read out max_allowed_current to see max supported value for current_lim.
         // float current_lim = 70.0f; //[A]
-        float current_lim = 10.0f;          //[A]
-        float current_lim_margin = 8.0f;    // Maximum violation of current_lim
-        float torque_lim = std::numeric_limits<float>::infinity();           //[Nm]. 
+        float current_lim = 10.0f;                                  //[A]
+        float current_lim_margin = 8.0f;                            // Maximum violation of current_lim
+        float torque_lim = std::numeric_limits<float>::infinity();  //[Nm].
         // Value used to compute shunt amplifier gains
-        float requested_current_range = 60.0f; // [A]
+        float requested_current_range = 60.0f;      // [A]
         float current_control_bandwidth = 1000.0f;  // [rad/s]
         float inverter_temp_limit_lower = 100;
         float inverter_temp_limit_upper = 120;
-        float acim_slip_velocity = 14.706f; // [rad/s electrical] = 1/rotor_tau
-        float acim_gain_min_flux = 10; // [A]
-        float acim_autoflux_min_Id = 10; // [A]
+        float acim_slip_velocity = 14.706f;  // [rad/s electrical] = 1/rotor_tau
+        float acim_gain_min_flux = 10;       // [A]
+        float acim_autoflux_min_Id = 10;     // [A]
         bool acim_autoflux_enable = false;
         float acim_autoflux_attack_gain = 10.0f;
         float acim_autoflux_decay_gain = 1.0f;
@@ -88,14 +90,23 @@ public:
             pre_calibrated = value;
             parent->is_calibrated_ = parent->is_calibrated_ || parent->config_.pre_calibrated;
         }
-        void set_phase_inductance(float value) { phase_inductance = value; parent->update_current_controller_gains(); }
-        void set_phase_resistance(float value) { phase_resistance = value; parent->update_current_controller_gains(); }
-        void set_current_control_bandwidth(float value) { current_control_bandwidth = value; parent->update_current_controller_gains(); }
+        void set_phase_inductance(float value) {
+            phase_inductance = value;
+            parent->update_current_controller_gains();
+        }
+        void set_phase_resistance(float value) {
+            phase_resistance = value;
+            parent->update_current_controller_gains();
+        }
+        void set_current_control_bandwidth(float value) {
+            current_control_bandwidth = value;
+            parent->update_current_controller_gains();
+        }
     };
 
     Motor(const MotorHardwareConfig_t& hw_config,
-         const GateDriverHardwareConfig_t& gate_driver_config,
-         Config_t& config);
+          const GateDriverHardwareConfig_t& gate_driver_config,
+          Config_t& config);
 
     bool arm();
     void disarm();
@@ -125,16 +136,15 @@ public:
     const MotorHardwareConfig_t& hw_config_;
     const GateDriverHardwareConfig_t gate_driver_config_;
     Config_t& config_;
-    Axis* axis_ = nullptr; // set by Axis constructor
+    Axis* axis_ = nullptr;  // set by Axis constructor
 
-//private:
+    // private:
 
-    DRV8301_Obj gate_driver_; // initialized in constructor
+    DRV8301_Obj gate_driver_;  // initialized in constructor
     uint16_t next_timings_[3] = {
         TIM_1_8_PERIOD_CLOCKS / 2,
         TIM_1_8_PERIOD_CLOCKS / 2,
-        TIM_1_8_PERIOD_CLOCKS / 2
-    };
+        TIM_1_8_PERIOD_CLOCKS / 2};
     bool next_timings_valid_ = false;
     uint16_t last_cpu_time_ = 0;
     int timing_log_index_ = 0;
@@ -149,14 +159,14 @@ public:
     uint32_t user_error_ = 0;
     // Do not write to this variable directly!
     // It is for exclusive use by the safety_critical_... functions.
-    ArmedState armed_state_ = ARMED_STATE_DISARMED; 
+    ArmedState armed_state_ = ARMED_STATE_DISARMED;
     bool is_calibrated_ = config_.pre_calibrated;
     Iph_BC_t current_meas_ = {0.0f, 0.0f};
     Iph_BC_t DC_calib_ = {0.0f, 0.0f};
-    float phase_current_rev_gain_ = 0.0f; // Reverse gain for ADC to Amps (to be set by DRV8301_setup)
+    float phase_current_rev_gain_ = 0.0f;  // Reverse gain for ADC to Amps (to be set by DRV8301_setup)
     CurrentControl_t current_control_ = {
-        .p_gain = 0.0f,        // [V/A] should be auto set after resistance and inductance measurement
-        .i_gain = 0.0f,        // [V/As] should be auto set after resistance and inductance measurement
+        .p_gain = 0.0f,  // [V/A] should be auto set after resistance and inductance measurement
+        .i_gain = 0.0f,  // [V/As] should be auto set after resistance and inductance measurement
         .v_current_control_integral_d = 0.0f,
         .v_current_control_integral_q = 0.0f,
         .Ibus = 0.0f,
@@ -166,8 +176,8 @@ public:
         .Iq_setpoint = 0.0f,
         .Iq_measured = 0.0f,
         .Id_measured = 0.0f,
-#if USER_CUSTOM_MOTOR_CODE_3
-        .I_measured_report_filter_k = 0.1f,//Id,Iq轴滤波系数
+#ifdef USER_CUSTOM_MOTOR_CODE_3
+        .I_measured_report_filter_k = 0.01f,  // Id,Iq轴滤波系数
 #else
         .I_measured_report_filter_k = 1.0f,
 #endif
@@ -180,8 +190,8 @@ public:
     struct : GateDriverIntf {
         DrvFault drv_fault = DRV_FAULT_NO_FAULT;
     } gate_driver_exported_;
-    DRV_SPI_8301_Vars_t gate_driver_regs_; //Local view of DRV registers (initialized by DRV8301_setup)
+    DRV_SPI_8301_Vars_t gate_driver_regs_;  // Local view of DRV registers (initialized by DRV8301_setup)
     float effective_current_lim_ = 10.0f;
 };
 
-#endif // __MOTOR_HPP
+#endif  // __MOTOR_HPP

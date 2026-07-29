@@ -21,7 +21,7 @@ firmware_file = ../../Firmware/build/ODriveFirmware.hex
 # 2.4 应用程序固件的参数部分路径列表
 # 每个参数文件将与主固件拼接，生成一个新固件
 # 参数文件名将被用作新固件的命名
-datafile_paths = ../../txt/光伏驱动轮/Run.hex, ../../txt/光伏滚刷/Brush.hex
+datafile_paths = ../../txt/光伏驱动轮/Run.hex, ../../txt/光伏滚刷/Brush.hex, ../../txt/光伏驱动轮短款/LiteRun.hex
 
 # 2.3 调试信息显示控制
 # show_debug = False  # 设置为True可查看详细调试信息
