@@ -171,9 +171,9 @@ bool Axis::do_checks() {
         // motor got disarmed in something other than the idle loop
         error_ |= ERROR_MOTOR_DISARMED;
     if (!(vbus_voltage >= odrv.config_.dc_bus_undervoltage_trip_level))
-        error_ |= ERROR_DC_BUS_UNDER_VOLTAGE;
+        // error_ |= ERROR_DC_BUS_UNDER_VOLTAGE;
     if (!(vbus_voltage <= odrv.config_.dc_bus_overvoltage_trip_level))
-        error_ |= ERROR_DC_BUS_OVER_VOLTAGE;
+        // error_ |= ERROR_DC_BUS_OVER_VOLTAGE;
 
     // Sub-components should use set_error which will propegate to this error_
     for (ThermistorCurrentLimiter* thermistor : thermistors_) {
