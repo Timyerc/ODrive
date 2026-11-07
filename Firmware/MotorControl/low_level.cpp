@@ -463,6 +463,10 @@ void vbus_sense_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
     // Only one conversion in sequence, so only rank1
     uint32_t ADCValue = HAL_ADCEx_InjectedGetValue(hadc, ADC_INJECTED_RANK_1);
     vbus_voltage = ADCValue * voltage_scale;
+    if (!(vbus_voltage >= odrv.config_.dc_bus_undervoltage_trip_level))
+        vbus_voltage = odrv.config_.dc_bus_undervoltage_trip_level;
+    if (!(vbus_voltage <= odrv.config_.dc_bus_overvoltage_trip_level))
+        vbus_voltage = odrv.config_.dc_bus_overvoltage_trip_level;
 }
 
 static void decode_hall_samples(Encoder& enc, uint16_t GPIO_samples[num_GPIO]) {

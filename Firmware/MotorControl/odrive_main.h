@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 //default timeout waiting for phase measurement signals
-#define PH_CURRENT_MEAS_TIMEOUT 2 // [ms]
+#define PH_CURRENT_MEAS_TIMEOUT 0 // [ms]
 
 // Period in [s]
 static const float current_meas_period = CURRENT_MEAS_PERIOD;
