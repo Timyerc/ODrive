@@ -242,6 +242,9 @@ public:
 
     // watchdog
     uint32_t watchdog_current_value_= 0;
+
+    // 上一次正常的编码器位置估计，用于回零时兜底
+    std::optional<float> last_pos_estimate_local_;
 };
 
 

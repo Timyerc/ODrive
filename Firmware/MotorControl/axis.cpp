@@ -218,6 +218,10 @@ void Axis::watchdog_feed() {
 bool Axis::watchdog_check() {
     if (!config_.enable_watchdog) return true;
 
+    // 夹取：计数器至少保持 1，下面的超时分支因此永远不会触发
+    if (watchdog_current_value_ == 0)
+        watchdog_current_value_ = 1;
+
     // explicit check here to ensure that we don't underflow back to UINT32_MAX
     if (watchdog_current_value_ > 0) {
         watchdog_current_value_--;

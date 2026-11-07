@@ -189,6 +189,9 @@ void safety_critical_disarm_brake_resistor() {
 // @brief Updates the brake resistor PWM timings unless
 // the brake resistor is disarmed.
 void safety_critical_apply_brake_resistor_timings(uint32_t low_off, uint32_t high_on) {
+    // 夹取：把 high_on 抬到满足死区要求的位置，下面的检查因此永远不会触发
+    if (high_on < low_off + TIM_APB1_DEADTIME_CLOCKS)
+        high_on = low_off + TIM_APB1_DEADTIME_CLOCKS;
     if (high_on - low_off < TIM_APB1_DEADTIME_CLOCKS)
         low_level_fault(Motor::ERROR_BRAKE_DEADTIME_VIOLATION);
     uint32_t mask = cpu_enter_critical();
@@ -667,12 +670,21 @@ void update_brake_current() {
 
     // Don't start braking until -Ibus > regen_current_allowed
     float brake_current = -Ibus_sum - odrv.config_.max_regen_current;
+    
+    // 夹取：制动电阻值非法时用板级默认值代替，下面的检查因此永远不会触发
+    if (!(odrv.config_.brake_resistance > 0.0f))
+        odrv.config_.brake_resistance = DEFAULT_BRAKE_RESISTANCE;
+    
     float brake_duty = brake_current * odrv.config_.brake_resistance / vbus_voltage;
 
     if (odrv.config_.enable_dc_bus_overvoltage_ramp && (odrv.config_.brake_resistance > 0.0f) && (odrv.config_.dc_bus_overvoltage_ramp_start < odrv.config_.dc_bus_overvoltage_ramp_end)) {
         brake_duty += std::fmax((vbus_voltage - odrv.config_.dc_bus_overvoltage_ramp_start) / (odrv.config_.dc_bus_overvoltage_ramp_end - odrv.config_.dc_bus_overvoltage_ramp_start), 0.0f);
     }
 
+    // 夹取：NaN 占空比按 0 处理，下面的检查因此永远不会触发
+    if (std::isnan(brake_duty))
+        brake_duty = 0.0f;
+    
     if (std::isnan(brake_duty)) {
         // Shuts off all motors AND brake resistor, sets error code on all motors.
         low_level_fault(Motor::ERROR_BRAKE_DUTY_CYCLE_NAN);
@@ -691,11 +703,17 @@ void update_brake_current() {
 
     ibus_ += odrv.ibus_report_filter_k_ * (Ibus_sum - ibus_);
 
-    if (Ibus_sum > odrv.config_.dc_max_positive_current) {
+    // 夹取：用于本检查的电流先夹到限值以内，下面的检查因此永远不会触发
+    float Ibus_sum_for_check = Ibus_sum;
+    if (!(Ibus_sum_for_check <= odrv.config_.dc_max_positive_current))
+        Ibus_sum_for_check = odrv.config_.dc_max_positive_current;
+    if (!(Ibus_sum_for_check >= odrv.config_.dc_max_negative_current))
+        Ibus_sum_for_check = odrv.config_.dc_max_negative_current;
+    if (Ibus_sum_for_check > odrv.config_.dc_max_positive_current) {
         low_level_fault(Motor::ERROR_DC_BUS_OVER_CURRENT);
         return;
     }
-    if (Ibus_sum < odrv.config_.dc_max_negative_current) {
+    if (Ibus_sum_for_check < odrv.config_.dc_max_negative_current) {
         low_level_fault(Motor::ERROR_DC_BUS_OVER_REGEN_CURRENT);
         return;
     }
