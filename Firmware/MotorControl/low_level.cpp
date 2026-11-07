@@ -670,11 +670,6 @@ void update_brake_current() {
 
     // Don't start braking until -Ibus > regen_current_allowed
     float brake_current = -Ibus_sum - odrv.config_.max_regen_current;
-    
-    // 夹取：制动电阻值非法时用板级默认值代替，下面的检查因此永远不会触发
-    if (!(odrv.config_.brake_resistance > 0.0f))
-        odrv.config_.brake_resistance = DEFAULT_BRAKE_RESISTANCE;
-    
     float brake_duty = brake_current * odrv.config_.brake_resistance / vbus_voltage;
 
     if (odrv.config_.enable_dc_bus_overvoltage_ramp && (odrv.config_.brake_resistance > 0.0f) && (odrv.config_.dc_bus_overvoltage_ramp_start < odrv.config_.dc_bus_overvoltage_ramp_end)) {
