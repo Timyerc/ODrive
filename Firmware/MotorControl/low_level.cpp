@@ -672,7 +672,7 @@ void update_brake_current() {
     if (odrv.config_.enable_dc_bus_overvoltage_ramp && (odrv.config_.brake_resistance > 0.0f) && (odrv.config_.dc_bus_overvoltage_ramp_start < odrv.config_.dc_bus_overvoltage_ramp_end)) {
         brake_duty += std::fmax((vbus_voltage - odrv.config_.dc_bus_overvoltage_ramp_start) / (odrv.config_.dc_bus_overvoltage_ramp_end - odrv.config_.dc_bus_overvoltage_ramp_start), 0.0f);
     }
-    
+
     if (std::isnan(brake_duty)) {
         // Shuts off all motors AND brake resistor, sets error code on all motors.
         low_level_fault(Motor::ERROR_BRAKE_DUTY_CYCLE_NAN);
@@ -691,17 +691,11 @@ void update_brake_current() {
 
     ibus_ += odrv.ibus_report_filter_k_ * (Ibus_sum - ibus_);
 
-    // 夹取：用于本检查的电流先夹到限值以内，下面的检查因此永远不会触发
-    float Ibus_sum_for_check = Ibus_sum;
-    if (!(Ibus_sum_for_check <= odrv.config_.dc_max_positive_current))
-        Ibus_sum_for_check = odrv.config_.dc_max_positive_current;
-    if (!(Ibus_sum_for_check >= odrv.config_.dc_max_negative_current))
-        Ibus_sum_for_check = odrv.config_.dc_max_negative_current;
-    if (Ibus_sum_for_check > odrv.config_.dc_max_positive_current) {
+    if (Ibus_sum > odrv.config_.dc_max_positive_current) {
         low_level_fault(Motor::ERROR_DC_BUS_OVER_CURRENT);
         return;
     }
-    if (Ibus_sum_for_check < odrv.config_.dc_max_negative_current) {
+    if (Ibus_sum < odrv.config_.dc_max_negative_current) {
         low_level_fault(Motor::ERROR_DC_BUS_OVER_REGEN_CURRENT);
         return;
     }
