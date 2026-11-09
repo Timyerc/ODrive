@@ -189,9 +189,6 @@ void safety_critical_disarm_brake_resistor() {
 // @brief Updates the brake resistor PWM timings unless
 // the brake resistor is disarmed.
 void safety_critical_apply_brake_resistor_timings(uint32_t low_off, uint32_t high_on) {
-    // 夹取：把 high_on 抬到满足死区要求的位置，下面的检查因此永远不会触发
-    if (high_on < low_off + TIM_APB1_DEADTIME_CLOCKS)
-        high_on = low_off + TIM_APB1_DEADTIME_CLOCKS;
     if (high_on - low_off < TIM_APB1_DEADTIME_CLOCKS)
         low_level_fault(Motor::ERROR_BRAKE_DEADTIME_VIOLATION);
     uint32_t mask = cpu_enter_critical();
@@ -675,10 +672,6 @@ void update_brake_current() {
     if (odrv.config_.enable_dc_bus_overvoltage_ramp && (odrv.config_.brake_resistance > 0.0f) && (odrv.config_.dc_bus_overvoltage_ramp_start < odrv.config_.dc_bus_overvoltage_ramp_end)) {
         brake_duty += std::fmax((vbus_voltage - odrv.config_.dc_bus_overvoltage_ramp_start) / (odrv.config_.dc_bus_overvoltage_ramp_end - odrv.config_.dc_bus_overvoltage_ramp_start), 0.0f);
     }
-
-    // 夹取：NaN 占空比按 0 处理，下面的检查因此永远不会触发
-    if (std::isnan(brake_duty))
-        brake_duty = 0.0f;
     
     if (std::isnan(brake_duty)) {
         // Shuts off all motors AND brake resistor, sets error code on all motors.

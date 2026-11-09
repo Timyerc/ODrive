@@ -1,14 +1,6 @@
 #ifndef __ODRIVE_MAIN_H
 #define __ODRIVE_MAIN_H
 
-// ============================================================================
-// 出错不停机开关
-//
-// 错误位照常置位、照常上报，只是不因为错误而 disarm 电机。
-// 需要恢复"出错即停机"的原始行为时，把下面的值改成 0。
-// ============================================================================
-#define ODRIVE_KEEP_ARMED_ON_ERROR 1
-
 // Note on central include scheme by Samuel:
 // there are circular dependencies between some of the header files,
 // e.g. the Motor header needs a forward declaration of Axis and vice versa
@@ -41,7 +33,7 @@ extern "C" {
 #endif
 
 //default timeout waiting for phase measurement signals
-#define PH_CURRENT_MEAS_TIMEOUT 0 // [ms]
+#define PH_CURRENT_MEAS_TIMEOUT 2 // [ms]
 
 // Period in [s]
 static const float current_meas_period = CURRENT_MEAS_PERIOD;
