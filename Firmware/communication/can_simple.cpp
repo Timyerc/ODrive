@@ -549,7 +549,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                     sendMotorSpeed(axes[1], 0x13);
                 }
             }
-            if(axes[0]->motor_.user_error_ == CANSimple::ERROR_M0_DC_BUS_OVER_CURRENT || axes[1]->motor_.user_error_ == CANSimple::ERROR_M1_DC_BUS_OVER_CURRENT) {
+            if(m0_over_current_count == 0 && m1_over_current_count == 0) {
                 axes[0]->controller_.input_vel_ = 0;
                 axes[1]->controller_.input_vel_ = 0;
             }
@@ -558,8 +558,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             sendMotorCurrent(axes[0]->config_.can_node_id, command.cmd, readDate8(msg, 8));
             break;
         case DRIVE_MANUAL_TRIGGER_ERROR:  // 手动触发错误
-            axes[0]->motor_.user_error_ |= CANSimple::ERROR_M0_DC_BUS_OVER_CURRENT; 
-            axes[1]->motor_.user_error_ |= CANSimple::ERROR_M1_DC_BUS_OVER_CURRENT; 
+            motor_overload_status();
             break;
         case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
             set_motor_current_threshold(readDate8(msg, 8), DRIVE__SET_CURRENT_THRESHOLD, readDate16(msg, 16), readDate16(msg, 32));
