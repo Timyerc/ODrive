@@ -133,3 +133,6 @@ for i in range(10000):
     
     print(f"A0: {vel0:6.3f} t/s, {curr0:6.2f} A | A1: {vel1:6.3f} t/s, {curr1:6.2f} A")
     time.sleep(0.1)
+
+odrv0.axis0.motor.config.current_lim = 5
+odrv0.axis0.motor.config.current_lim_margin = 5

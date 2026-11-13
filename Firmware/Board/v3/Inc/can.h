@@ -106,6 +106,8 @@ typedef enum {
     // DRIVE_ENCODER_CALIBRATION  = 0xC2,      //编码器校准
     // DRIVE_CLOSED_LOOP_CONTROL  = 0xC3,      //进入闭环模式
     // DRIVE_IDLE_MODE            = 0xC4,      //进入空闲模式
+
+    DRIVE_MANUAL_TRIGGER_ERROR    = 0xC9,      //手动触发错误
     DRIVE__SET_CURRENT_THRESHOLD  = 0xCA,      //设置电机过载电流阈值
     DRIVE__GET_CURRENT_THRESHOLD  = 0xCB,      //获取电机过载电流阈值
     DRIVE__SET_MAX_SPEED_LIMIT    = 0xCC,      //设置电机最大速度限制

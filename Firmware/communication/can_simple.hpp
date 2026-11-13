@@ -39,15 +39,16 @@ class CANSimple {
         ERROR_M1_OVER_CURRENT = 0x00000002,
         ERROR_M0_ILLEGAL_HALL = 0x00000004,
         ERROR_M1_ILLEGAL_HALL = 0x00000008,
+        ERROR_M0_DC_BUS_OVER_CURRENT = 0x00000010,
+        ERROR_M1_DC_BUS_OVER_CURRENT = 0x00000020,
     };
 
     static uint32_t alive;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
     static void keepAlive(Axis* axis);
+    static void motor_overload_status(void);
    private:
-
-
 
     // ovo-new
     static uint8_t readDate8(const can_Message_t& msg, uint8_t index);
@@ -56,6 +57,7 @@ class CANSimple {
     static bool sendMotorSpeed(Axis* axis,uint32_t motorNum);
     static void hall_error_handing(void);
     static void hot_plugging_error_handing(void);
+    static void motor_overload_recovery(void);
     static void motor_overload_output(void);
     static void get_motor_current_threshold(uint8_t motorNum, uint8_t msg_id);
     static void sendMotorCurrent(uint32_t can_id, uint8_t msg_id, uint8_t mode);

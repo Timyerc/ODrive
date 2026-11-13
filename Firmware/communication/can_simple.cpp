@@ -95,28 +95,28 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[4] = axis->motor_.error_;
     } else if (axis->encoder_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x05;  // 霍尔故障
+        txmsg.buf[0] = 0x05;  // 编码器故障
         txmsg.buf[1] = axis->encoder_.error_ >> 24;
         txmsg.buf[2] = axis->encoder_.error_ >> 16;
         txmsg.buf[3] = axis->encoder_.error_ >> 8;
         txmsg.buf[4] = axis->encoder_.error_;
     } else if (axis->sensorless_estimator_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x03;  // 电机过流
+        txmsg.buf[0] = 0x03;  // 传感器无速度估计故障
         txmsg.buf[1] = axis->sensorless_estimator_.error_ >> 24;
         txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 16;
         txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 8;
         txmsg.buf[4] = axis->sensorless_estimator_.error_;
     } else if (axis->controller_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x01;  //
+        txmsg.buf[0] = 0x01;  // 控制器故障
         txmsg.buf[1] = axis->controller_.error_ >> 24;
         txmsg.buf[2] = axis->controller_.error_ >> 16;
         txmsg.buf[3] = axis->controller_.error_ >> 8;
         txmsg.buf[4] = axis->controller_.error_;
     } else if (axis->error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x02;  //
+        txmsg.buf[0] = 0x02;  // 总线故障
         txmsg.buf[1] = axis->error_ >> 24;
         txmsg.buf[2] = axis->error_ >> 16;
         txmsg.buf[3] = axis->error_ >> 8;
@@ -215,6 +215,40 @@ void CANSimple::hot_plugging_error_handing(void) {
     }
 }
 
+uint8_t m0_over_current_count = 0;
+uint8_t m1_over_current_count = 0;
+
+//标记电机过流错误
+void CANSimple::motor_overload_status(void) {
+    m0_over_current_count = 10;  // 锁定转速设置
+    m1_over_current_count = 10;  // 锁定转速设置
+    axes[0]->motor_.user_error_ |= ERROR_M0_DC_BUS_OVER_CURRENT;
+    axes[1]->motor_.user_error_ |= ERROR_M1_DC_BUS_OVER_CURRENT;
+
+}
+/**
+ * @brief Handle motor overload by clearing errors and resetting motor state.
+ */
+void CANSimple::motor_overload_recovery(void) {
+    if (axes[0]->motor_.user_error_ & ERROR_M0_DC_BUS_OVER_CURRENT) {
+        axes[0]->clear_errors();
+        axes[0]->controller_.input_vel_ = 0;
+        axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        axes[0]->motor_.user_error_ = 0;
+    }
+    if (axes[1]->motor_.user_error_ & ERROR_M1_DC_BUS_OVER_CURRENT) {
+        axes[1]->clear_errors();
+        axes[1]->controller_.input_vel_ = 0;
+        axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        axes[1]->motor_.user_error_ = 0;
+    }
+    if (m0_over_current_count > 0) {
+        m0_over_current_count --;
+    }
+    if (m1_over_current_count > 0) {
+        m1_over_current_count --;
+    }
+}
 int32_t m0_absoluteValue;    // 毫安
 int32_t m1_absoluteValue;    // 毫安
 int32_t ibus_absoluteValue;  // 毫安
@@ -299,6 +333,7 @@ void CANSimple::keepAlive(Axis* axis) {
     motor_overload_output();       // 电流过载保护输出
     hall_error_handing();          // 霍尔状态检测
     hot_plugging_error_handing();  // 热插拔错误
+    motor_overload_recovery();  // 过流错误恢复
 #if ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
@@ -484,10 +519,17 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
             command.leftSpeed = readDate16(msg, 8);
             command.rightSpeed = readDate16(msg, 24);
-            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit / 32768;   // 进行速度换算
-            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit / 32768;  // 进行速度换算
-            // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
-            // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+
+            if(m0_over_current_count == 0 && m1_over_current_count == 0) {
+                axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit / 32768;   // 进行速度换算
+                axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit / 32768;  // 进行速度换算
+                // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+                // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+            }
+            else {
+                axes[0]->controller_.input_vel_ = 0;
+                axes[1]->controller_.input_vel_ = 0;
+            }
             break;
 
         case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06
@@ -507,9 +549,17 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                     sendMotorSpeed(axes[1], 0x13);
                 }
             }
+            if(axes[0]->motor_.user_error_ == CANSimple::ERROR_M0_DC_BUS_OVER_CURRENT || axes[1]->motor_.user_error_ == CANSimple::ERROR_M1_DC_BUS_OVER_CURRENT) {
+                axes[0]->controller_.input_vel_ = 0;
+                axes[1]->controller_.input_vel_ = 0;
+            }
             break;
         case DRIVE_COMMAND0_READ_CURRENT:  // 电流读取
             sendMotorCurrent(axes[0]->config_.can_node_id, command.cmd, readDate8(msg, 8));
+            break;
+        case DRIVE_MANUAL_TRIGGER_ERROR:  // 手动触发错误
+            axes[0]->motor_.user_error_ |= CANSimple::ERROR_M0_DC_BUS_OVER_CURRENT; 
+            axes[1]->motor_.user_error_ |= CANSimple::ERROR_M1_DC_BUS_OVER_CURRENT; 
             break;
         case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
             set_motor_current_threshold(readDate8(msg, 8), DRIVE__SET_CURRENT_THRESHOLD, readDate16(msg, 16), readDate16(msg, 32));
