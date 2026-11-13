@@ -19,6 +19,7 @@
 #include <utils.hpp>
 
 #include "odrive_main.h"
+#include <communication/can_simple.hpp>
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -124,6 +125,7 @@ bool safety_critical_disarm_motor_pwm(Motor& motor) {
     motor.armed_state_ = Motor::ARMED_STATE_DISARMED;
     __HAL_TIM_MOE_DISABLE_UNCONDITIONALLY(motor.hw_config_.timer);
     cpu_exit_critical(mask);
+    CANSimple::motor_overload_status();
     return was_armed;
 }
 
