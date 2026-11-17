@@ -1,5 +1,5 @@
-#include "can_simple.hpp"
 
+#include "can_simple.hpp"
 #include <odrive_main.h>
 
 #include <cstring>
@@ -633,84 +633,82 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     if (validAxis) {
         axis->watchdog_feed();
         switch (cmd) {
-#if 0
-        case MSG_CO_NMT_CTRL:
-            break;
-        case MSG_CO_HEARTBEAT_CMD:
-            break;
-        case MSG_ODRIVE_HEARTBEAT:
-            // We don't currently do anything to respond to ODrive heartbeat messages
-            break;
-        case MSG_ODRIVE_ESTOP:
-            estop_callback(axis, msg);
-            break;
-        case MSG_GET_MOTOR_ERROR:
-            get_motor_error_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_ERROR:
-            get_encoder_error_callback(axis, msg);
-            break;
-        case MSG_GET_SENSORLESS_ERROR:
-            get_sensorless_error_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_NODE_ID:
-            set_axis_nodeid_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_REQUESTED_STATE:
-            set_axis_requested_state_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_STARTUP_CONFIG:
-            set_axis_startup_config_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_ESTIMATES:
-            get_encoder_estimates_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_COUNT:
-            get_encoder_count_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_POS:
-            set_input_pos_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_VEL:
-            set_input_vel_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_TORQUE:
-            set_input_torque_callback(axis, msg);
-            break;
-        case MSG_SET_CONTROLLER_MODES:
-            set_controller_modes_callback(axis, msg);
-            break;
-        case MSG_SET_VEL_LIMIT:
-            set_vel_limit_callback(axis, msg);
-            break;
-        case MSG_START_ANTICOGGING:
-            start_anticogging_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_INERTIA:
-            set_traj_inertia_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_ACCEL_LIMITS:
-            set_traj_accel_limits_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_VEL_LIMIT:
-            set_traj_vel_limit_callback(axis, msg);
-            break;
-        case MSG_GET_IQ:
-            get_iq_callback(axis, msg);
-            break;
-        case MSG_GET_SENSORLESS_ESTIMATES:
-            get_sensorless_estimates_callback(axis, msg);
-            break;
-        case MSG_RESET_ODRIVE:
-            NVIC_SystemReset();
-            break;
-        case MSG_GET_VBUS_VOLTAGE:
-            get_vbus_voltage_callback(axis, msg);
-            break;
-        case MSG_CLEAR_ERRORS:
-            clear_errors_callback(axis, msg);
-            break;
-#endif
+            case MSG_CO_NMT_CTRL:
+                break;
+            case MSG_CO_HEARTBEAT_CMD:
+                break;
+            case MSG_ODRIVE_HEARTBEAT:
+                // We don't currently do anything to respond to ODrive heartbeat messages
+                break;
+            case MSG_ODRIVE_ESTOP:
+                estop_callback(axis, msg);
+                break;
+            case MSG_GET_MOTOR_ERROR:
+                get_motor_error_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_ERROR:
+                get_encoder_error_callback(axis, msg);
+                break;
+            case MSG_GET_SENSORLESS_ERROR:
+                get_sensorless_error_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_NODE_ID:
+                set_axis_nodeid_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_REQUESTED_STATE:
+                set_axis_requested_state_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_STARTUP_CONFIG:
+                set_axis_startup_config_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_ESTIMATES:
+                get_encoder_estimates_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_COUNT:
+                get_encoder_count_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_POS:
+                set_input_pos_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_VEL:
+                set_input_vel_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_TORQUE:
+                set_input_torque_callback(axis, msg);
+                break;
+            case MSG_SET_CONTROLLER_MODES:
+                set_controller_modes_callback(axis, msg);
+                break;
+            case MSG_SET_VEL_LIMIT:
+                set_vel_limit_callback(axis, msg);
+                break;
+            case MSG_START_ANTICOGGING:
+                start_anticogging_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_INERTIA:
+                set_traj_inertia_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_ACCEL_LIMITS:
+                set_traj_accel_limits_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_VEL_LIMIT:
+                set_traj_vel_limit_callback(axis, msg);
+                break;
+            case MSG_GET_IQ:
+                get_iq_callback(axis, msg);
+                break;
+            case MSG_GET_SENSORLESS_ESTIMATES:
+                get_sensorless_estimates_callback(axis, msg);
+                break;
+            case MSG_RESET_ODRIVE:
+                NVIC_SystemReset();
+                break;
+            case MSG_GET_VBUS_VOLTAGE:
+                get_vbus_voltage_callback(axis, msg);
+                break;
+            case MSG_CLEAR_ERRORS:
+                clear_errors_callback(axis, msg);
+                break;
             default:
                 break;
         }
