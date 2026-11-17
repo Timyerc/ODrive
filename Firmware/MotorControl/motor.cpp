@@ -365,9 +365,11 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
         set_error(ERROR_CURRENT_LIMIT_VIOLATION);
         return false;
     }
+
     // Current error
     float Ierr_d = Id_des - Id;
     float Ierr_q = Iq_des - Iq;
+
 #ifdef USER_CUSTOM_MOTOR_CODE_2
     // For testing - if stop flag is 2, ignore current error and just run open
     if (this->getStopFlag() == 2) {

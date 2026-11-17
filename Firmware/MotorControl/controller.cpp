@@ -296,12 +296,14 @@ bool Controller::update(float* torque_setpoint_output) {
     if (anticogging_valid_ && config_.anticogging.anticogging_enabled) {
         torque += config_.anticogging.cogging_map[std::clamp(mod((int)anticogging_pos, 3600), 0, 3600)];
     }
+
     float v_err = 0.0f;
     if (config_.control_mode >= CONTROL_MODE_VELOCITY_CONTROL) {
         if (!vel_estimate_src) {
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
+
 #ifdef USER_CUSTOM_MOTOR_CODE_1
 /*防抖动：目标速度后反馈都为零的时候*/
         if (input_vel_ != 0 && this->getStopFlag() == 0) {

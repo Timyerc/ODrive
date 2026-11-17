@@ -46,6 +46,8 @@ class CANSimple {
     static uint32_t alive;
     static void handle_can_message(can_Message_t& msg);
     static void send_heartbeat(Axis* axis);
+
+    // ovo-new
     static void keepAlive(Axis* axis);
     static void motor_overload_status(void);
    private:
@@ -69,7 +71,7 @@ class CANSimple {
     static void odrive_debug(can_Message_t& msg);
     static void send_odrive_data(uint16_t msg_id, uint8_t type);
 
-
+    // CAN callback functions
     static void nmt_callback(Axis* axis, can_Message_t& msg);
     static void estop_callback(Axis* axis, can_Message_t& msg);
     static void get_motor_error_callback(Axis* axis, can_Message_t& msg);
