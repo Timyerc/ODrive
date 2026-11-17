@@ -56,13 +56,17 @@ public:
         uint32_t can_node_id = 0; // Both axes will have the same id to start
         bool can_node_id_extended = false;
         uint32_t can_heartbeat_rate_ms = 100;
+#ifdef USER_CUSTOM_MOTOR_CODE_0
+        // ovo new settings for custom motor code 5 
+        // ovo: 添加参数会导致数据结构变化，可使用预留的 template_para 参数，避免修改数据结构
         uint16_t heartbeat_rate_ms = 30;    // 100ms units
         uint16_t current_threshold_mA = 10000; // Current threshold for M0 message in mA
         uint16_t max_speed_limit = 50;// [turns/s], for step/dir input
         uint16_t template_para1 = 0;
         uint16_t template_para2 = 0;
         uint16_t template_para3 = 0;
-        uint16_t template_para4 = 0; // reserved for future use
+        uint16_t template_para4 = 0;
+#endif
         // custom setters
         Axis* parent = nullptr;
         void set_step_gpio_pin(uint16_t value) { step_gpio_pin = value; parent->decode_step_dir_pins(); }

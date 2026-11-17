@@ -224,7 +224,6 @@ void CANSimple::motor_overload_status(void) {
     m1_over_current_count = 10;  // 锁定转速设置
     axes[0]->motor_.user_error_ |= ERROR_M0_DC_BUS_OVER_CURRENT;
     axes[1]->motor_.user_error_ |= ERROR_M1_DC_BUS_OVER_CURRENT;
-
 }
 /**
  * @brief Handle motor overload by clearing errors and resetting motor state.
