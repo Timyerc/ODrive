@@ -404,11 +404,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     }
 
     // Compute estimated bus current
-#ifdef USER_CUSTOM_MOTOR_CODE_3
-    ictrl.Ibus = mod_d * ictrl.Id_measured + mod_q * ictrl.Iq_measured;
-#else
     ictrl.Ibus = mod_d * Id + mod_q * Iq;
-#endif
 
     // Inverse park transform
     float c_p = our_arm_cos_f32(pwm_phase);

@@ -548,7 +548,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                     sendMotorSpeed(axes[1], 0x13);
                 }
             }
-            if(m0_over_current_count == 0 && m1_over_current_count == 0) {
+            if(m0_over_current_count != 0 || m1_over_current_count != 0) {
                 axes[0]->controller_.input_vel_ = 0;
                 axes[1]->controller_.input_vel_ = 0;
             }
