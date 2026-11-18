@@ -587,7 +587,7 @@ void pwm_trig_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
         // measurement is ready when we receive the ADC3 measurement
 #ifdef USER_CUSTOM_MOTOR_CODE_4
         // 低通滤波
-        static constexpr float CURRENT_FILTER_K = 0.15f;
+        static constexpr float CURRENT_FILTER_K = 0.1f;
 
         if (hadc == &hadc2) {
             float raw_current = current - axis.motor_.DC_calib_.phB;
