@@ -13,6 +13,10 @@
 #define UART_TX_BUFFER_SIZE 64
 #define UART_RX_BUFFER_SIZE 64
 
+// Periodic UART TX frame: 20 bytes, header 0x5A 0x5A, every 200 ms
+#define UART_TX_FRAME_SIZE 20
+#define UART_TX_PERIOD_MS 200
+
 // DMA open loop continous circular buffer
 // 1ms delay periodic, chase DMA ptr around
 static uint8_t dma_rx_buffer[UART_RX_BUFFER_SIZE];
@@ -95,6 +99,39 @@ static void uart_server_thread(void * ctx) {
     };
 }
 
+// Periodic UART TX task: sends a 20-byte frame (header 0x5A 0x5A) every 200 ms.
+static void uart_tx_thread(void * ctx) {
+    (void) ctx;
+
+    uint8_t frame[UART_TX_FRAME_SIZE];
+    uint8_t seq = 0;
+
+    for (;;) {
+        frame[0] = 0x5A;
+        frame[1] = 0x5A;
+        frame[2] = seq++;
+
+        // ---- 在这里填 frame[3] ~ frame[19]，共 17 字节 ----
+        // 示例（16 位小端）：
+        //   uint16_t v = ...;
+        //   frame[3] = (uint8_t)(v & 0xFF);
+        //   frame[4] = (uint8_t)(v >> 8);
+        // 目前先填 0，方便先用串口助手确认帧头和周期。
+        memset(&frame[3], 0, UART_TX_FRAME_SIZE - 3);
+
+        if (uart4_stream_output_ptr) {
+            uart4_stream_output_ptr->process_bytes(frame, UART_TX_FRAME_SIZE, nullptr);
+        }
+
+        osDelay(UART_TX_PERIOD_MS);
+    }
+}
+
+static void start_uart_tx_task(void) {
+    osThreadDef(uart_tx_thread_def, uart_tx_thread, osPriorityBelowNormal, 0, 256);
+    osThreadCreate(osThread(uart_tx_thread_def), NULL);
+}
+
 void start_uart_server() {
     // DMA is set up to recieve in a circular buffer forever.
     // We dont use interrupts to fetch the data, instead we periodically read
@@ -105,6 +142,9 @@ void start_uart_server() {
     // Start UART communication thread
     osThreadDef(uart_server_thread_def, uart_server_thread, osPriorityNormal, 0, stack_size_uart_thread / sizeof(StackType_t) /* the ascii protocol needs considerable stack space */);
     uart_thread = osThreadCreate(osThread(uart_server_thread_def), NULL);
+
+    // Start periodic TX task
+    start_uart_tx_task();
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef* huart) {
