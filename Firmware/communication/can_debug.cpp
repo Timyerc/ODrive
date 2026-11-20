@@ -105,10 +105,10 @@ void CANSimple::send_odrive_data(uint16_t msg_id, uint8_t type)
             value = (int32_t)(axes[1]->motor_.current_meas_.phC * 1000.0f); // ADC value
             break;
         case CUSTOM_4:
-            value = CUSTOM_4;
+            value = odrv.debug_var_;
             break;
         case CUSTOM_5:
-            value = CUSTOM_5;
+            value = odrv.debug_error_;
             break;
         case CUSTOM_6:
             value = CUSTOM_6;

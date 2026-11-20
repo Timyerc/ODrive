@@ -91,6 +91,7 @@ void Encoder::update_pll_gains() {
 
     // Check that we don't get problems with discrete time approximation
     if (!(current_meas_period * pll_kp_ < 1.0f)) {
+        odrv.debug_error_ |= 0x00020000;
         set_error(ERROR_UNSTABLE_GAIN);
     }
 }
@@ -186,6 +187,7 @@ bool Encoder::run_offset_calibration() {
 
     // Require index found if enabled
     if (config_.use_index && !index_found_) {
+        odrv.debug_error_ |= 0x00040000;
         set_error(ERROR_INDEX_NOT_FOUND_YET);
         return false;
     }
@@ -242,6 +244,7 @@ bool Encoder::run_offset_calibration() {
         axis_->motor_.config_.direction = -1;
     } else {
         // Encoder response error
+        odrv.debug_error_ |= 0x00080000;
         set_error(ERROR_NO_RESPONSE);
         return false;
     }
@@ -252,6 +255,7 @@ bool Encoder::run_offset_calibration() {
     float expected_encoder_delta = config_.calib_scan_distance / elec_rad_per_enc;
     calib_scan_response_ = std::abs(shadow_count_ - init_enc_val);
     if (std::abs(calib_scan_response_ - expected_encoder_delta) / expected_encoder_delta > config_.calib_range) {
+        odrv.debug_error_ |= 0x00100000;
         set_error(ERROR_CPR_POLEPAIRS_MISMATCH);
         return false;
     }
@@ -318,6 +322,7 @@ void Encoder::sample_now() {
         } break;
 
         default: {
+           odrv.debug_error_ |= 0x00200000;
            set_error(ERROR_UNSUPPORTED_ENCODER_MODE);
         } break;
     }
@@ -351,6 +356,7 @@ bool Encoder::abs_spi_start_transaction(){
     if (mode_ & MODE_FLAG_ABS){
         axis_->motor_.log_timing(TIMING_LOG_SPI_START);
         if(hw_config_.spi->State != HAL_SPI_STATE_READY){
+            odrv.debug_error_ |= 0x00400000;
             set_error(ERROR_ABS_SPI_NOT_READY);
             return false;
         }
@@ -407,6 +413,7 @@ void Encoder::abs_spi_cb(){
         } break;
 
         default: {
+           odrv.debug_error_ |= 0x00800000;
            set_error(ERROR_UNSUPPORTED_ENCODER_MODE);
            return;
         } break;
@@ -459,6 +466,7 @@ bool Encoder::update() {
                     delta_enc -= 6;
             } else {
                 if (!config_.ignore_illegal_hall_state) {
+                    odrv.debug_error_ |= 0x01000000;
                     set_error(ERROR_ILLEGAL_HALL_STATE);
                     return false;
                 }
@@ -483,8 +491,10 @@ bool Encoder::update() {
             if (abs_spi_pos_updated_ == false) {
                 // Low pass filter the error
                 spi_error_rate_ += current_meas_period * (1.0f - spi_error_rate_);
-                if (spi_error_rate_ > 0.005f)
+                if (spi_error_rate_ > 0.005f) {
+                    odrv.debug_error_ |= 0x02000000;
                     set_error(ERROR_ABS_SPI_COM_FAIL);
+                }
             } else {
                 // Low pass filter the error
                 spi_error_rate_ += current_meas_period * (0.0f - spi_error_rate_);
@@ -499,6 +509,7 @@ bool Encoder::update() {
 
         }break;
         default: {
+           odrv.debug_error_ |= 0x04000000;
            set_error(ERROR_UNSUPPORTED_ENCODER_MODE);
            return false;
         } break;

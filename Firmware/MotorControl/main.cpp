@@ -214,11 +214,19 @@ int odrive_main(void);
 void vApplicationStackOverflowHook(xTaskHandle *pxTask, signed portCHAR *pcTaskName) {
     for(auto& axis : axes){
         safety_critical_disarm_motor_pwm(axis->motor_);
+        odrv.debug_var_ |= 0x00000002;
     }
         safety_critical_disarm_brake_resistor();
     for (;;); // TODO: safe action
 }
 void vApplicationIdleHook(void) {
+    static bool debug_flags_cleared = false;
+    if (!debug_flags_cleared && xTaskGetTickCount() >= pdMS_TO_TICKS(3000)) {
+        odrv.debug_error_ = 0;
+        odrv.debug_var_ = 0;
+        debug_flags_cleared = true;
+    }
+
     if (odrv.system_stats_.fully_booted) {
         odrv.system_stats_.uptime = xTaskGetTickCount();
         odrv.system_stats_.min_heap_space = xPortGetMinimumEverFreeHeapSize();

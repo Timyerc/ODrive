@@ -288,6 +288,8 @@ public:
     bool user_config_loaded_;
 
     uint32_t test_property_ = 0;
+    uint32_t debug_var_ = 0;
+    uint32_t debug_error_ = 0; // Added to track debug variable similar to odrv.debug_var_
 };
 
 extern ODrive odrv; // defined in main.cpp

@@ -142,11 +142,13 @@ void Motor::set_error(Motor::Error error){
     error_ |= error;
     axis_->error_ |= Axis::ERROR_MOTOR_FAILED;
     safety_critical_disarm_motor_pwm(*this);
+    odrv.debug_var_ |= 0x00000004;
     update_brake_current();
 }
 
 bool Motor::do_checks() {
     if (!check_DRV_fault()) {
+        odrv.debug_error_ |= 0x00000001;
         set_error(ERROR_DRV_FAULT);
         return false;
     }
@@ -220,8 +222,11 @@ bool Motor::measure_phase_resistance(float test_current, float max_voltage) {
     axis_->run_control_loop([&](){
         float Ialpha = -(current_meas_.phB + current_meas_.phC);
         test_voltage += (kI * current_meas_period) * (test_current - Ialpha);
-        if (test_voltage > max_voltage || test_voltage < -max_voltage)
-            return set_error(ERROR_PHASE_RESISTANCE_OUT_OF_RANGE), false;
+        if (test_voltage > max_voltage || test_voltage < -max_voltage) {
+            odrv.debug_error_ |= 0x00000002;
+            set_error(ERROR_PHASE_RESISTANCE_OUT_OF_RANGE);
+            return false;
+        }
 
         // Test voltage along phase A
         if (!enqueue_voltage_timings(test_voltage, 0.0f))
@@ -274,8 +279,11 @@ bool Motor::measure_phase_inductance(float voltage_low, float voltage_high) {
 
     config_.phase_inductance = L;
     // TODO arbitrary values set for now
-    if (L < 2e-6f || L > 4000e-6f)
-        return set_error(ERROR_PHASE_INDUCTANCE_OUT_OF_RANGE), false;
+    if (L < 2e-6f || L > 4000e-6f) {
+        odrv.debug_error_ |= 0x00000004;
+        set_error(ERROR_PHASE_INDUCTANCE_OUT_OF_RANGE);
+        return false;
+    }
     return true;
 }
 
@@ -302,8 +310,11 @@ bool Motor::run_calibration() {
 
 bool Motor::enqueue_modulation_timings(float mod_alpha, float mod_beta) {
     float tA, tB, tC;
-    if (SVM(mod_alpha, mod_beta, &tA, &tB, &tC) != 0)
-        return set_error(ERROR_MODULATION_MAGNITUDE), false;
+    if (SVM(mod_alpha, mod_beta, &tA, &tB, &tC) != 0) {
+        odrv.debug_error_ |= 0x00000008;
+        set_error(ERROR_MODULATION_MAGNITUDE);
+        return false;
+    }
     next_timings_[0] = (uint16_t)(tA * (float)TIM_1_8_PERIOD_CLOCKS);
     next_timings_[1] = (uint16_t)(tB * (float)TIM_1_8_PERIOD_CLOCKS);
     next_timings_[2] = (uint16_t)(tC * (float)TIM_1_8_PERIOD_CLOCKS);
@@ -339,6 +350,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 
     // Check for current sense saturation
     if (std::abs(current_meas_.phB) > ictrl.overcurrent_trip_level || std::abs(current_meas_.phC) > ictrl.overcurrent_trip_level) {
+        odrv.debug_error_ |= 0x00000010;
         set_error(ERROR_CURRENT_SENSE_SATURATION);
         return false;
     }
@@ -362,6 +374,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 #else
     if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
 #endif
+        odrv.debug_error_ |= 0x00000020;
         set_error(ERROR_CURRENT_LIMIT_VIOLATION);
         return false;
     }
@@ -512,7 +525,11 @@ bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
         case MOTOR_TYPE_HIGH_CURRENT: return FOC_current(id, iq, phase, pwm_phase); break;
         case MOTOR_TYPE_ACIM: return FOC_current(id, iq, phase, pwm_phase); break;
         case MOTOR_TYPE_GIMBAL: return FOC_voltage(id, iq, pwm_phase); break;
-        default: set_error(ERROR_NOT_IMPLEMENTED_MOTOR_TYPE); return false; break;
+        default:
+            odrv.debug_error_ |= 0x00000040;
+            set_error(ERROR_NOT_IMPLEMENTED_MOTOR_TYPE);
+            return false;
+            break;
     }
     return true;
 }
