@@ -42,7 +42,7 @@ bool Controller::select_encoder(size_t encoder_num) {
         vel_estimate_valid_src_ = &ax->encoder_.vel_estimate_valid_;
         return true;
     } else {
-        odrv.debug_error_ |= 0x00000080;
+        ODRIVE_DEBUG_SETERROR(0x00000080);
         set_error(Controller::ERROR_INVALID_LOAD_ENCODER);
         return false;
     }
@@ -132,7 +132,7 @@ bool Controller::update(float* torque_setpoint_output) {
     float anticogging_pos = axis_->encoder_.pos_estimate_ / axis_->encoder_.getCoggingRatio();
     if (config_.anticogging.calib_anticogging) {
         if (!axis_->encoder_.pos_estimate_valid_ || !axis_->encoder_.vel_estimate_valid_) {
-            odrv.debug_error_ |= 0x00000100;
+            ODRIVE_DEBUG_SETERROR(0x00000100);
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
@@ -185,7 +185,7 @@ bool Controller::update(float* torque_setpoint_output) {
                 pos_setpoint_ = axes[config_.axis_to_mirror]->encoder_.pos_estimate_ * config_.mirror_ratio;
                 vel_setpoint_ = axes[config_.axis_to_mirror]->encoder_.vel_estimate_ * config_.mirror_ratio;
             } else {
-                odrv.debug_error_ |= 0x00000200;
+                ODRIVE_DEBUG_SETERROR(0x00000200);
                 set_error(ERROR_INVALID_MIRROR_AXIS);
                 return false;
             }
@@ -219,7 +219,7 @@ bool Controller::update(float* torque_setpoint_output) {
             anticogging_pos = pos_setpoint_; // FF the position setpoint instead of the pos_estimate
         } break;
         default: {
-            odrv.debug_error_ |= 0x00000400;
+            ODRIVE_DEBUG_SETERROR(0x00000400);
             set_error(ERROR_INVALID_INPUT_MODE);
             return false;
         }
@@ -235,7 +235,7 @@ bool Controller::update(float* torque_setpoint_output) {
 
         if (config_.circular_setpoints) {
             if(!pos_estimate_circular) {
-                odrv.debug_error_ |= 0x00000800;
+                ODRIVE_DEBUG_SETERROR(0x00000800);
                 set_error(ERROR_INVALID_ESTIMATE);
                 return false;
             }
@@ -246,7 +246,7 @@ bool Controller::update(float* torque_setpoint_output) {
             pos_err = wrap_pm(pos_err, 0.5f * *pos_wrap_src_);
         } else {
             if(!pos_estimate_linear) {
-                odrv.debug_error_ |= 0x00001000;
+                ODRIVE_DEBUG_SETERROR(0x00001000);
                 set_error(ERROR_INVALID_ESTIMATE);
                 return false;
             }
@@ -270,12 +270,12 @@ bool Controller::update(float* torque_setpoint_output) {
     // Check for overspeed fault (done in this module (controller) for cohesion with vel_lim)
     if (config_.enable_overspeed_error) {  // 0.0f to disable
         if (!vel_estimate_src) {
-            odrv.debug_error_ |= 0x00002000;
+            ODRIVE_DEBUG_SETERROR(0x00002000);
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
         if (std::abs(*vel_estimate_src) > config_.vel_limit_tolerance * vel_lim) {
-            odrv.debug_error_ |= 0x00004000;
+            ODRIVE_DEBUG_SETERROR(0x00004000);
             set_error(ERROR_OVERSPEED);
             return false;
         }
@@ -309,7 +309,7 @@ bool Controller::update(float* torque_setpoint_output) {
     float v_err = 0.0f;
     if (config_.control_mode >= CONTROL_MODE_VELOCITY_CONTROL) {
         if (!vel_estimate_src) {
-            odrv.debug_error_ |= 0x00008000;
+            ODRIVE_DEBUG_SETERROR(0x00008000);
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }
@@ -342,7 +342,7 @@ bool Controller::update(float* torque_setpoint_output) {
     // Velocity limiting in current mode
     if (config_.control_mode < CONTROL_MODE_VELOCITY_CONTROL && config_.enable_current_mode_vel_limit) {
         if (!vel_estimate_src) {
-            odrv.debug_error_ |= 0x00010000;
+            ODRIVE_DEBUG_SETERROR(0x00010000);
             set_error(ERROR_INVALID_ESTIMATE);
             return false;
         }

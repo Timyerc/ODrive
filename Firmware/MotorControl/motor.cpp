@@ -110,9 +110,9 @@ void Motor::DRV8301_setup() {
     DRV8301_enable(&gate_driver_);
     DRV8301_setupSpi(&gate_driver_, local_regs);
 
-    local_regs->Ctrl_Reg_1.OC_MODE = DRV8301_OcMode_LatchShutDown;
+    local_regs->Ctrl_Reg_1.OC_MODE = DRV8301_OcMode_CurrentLimit;
     // Overcurrent set to approximately 150A at 100degC. This may need tweaking.
-    local_regs->Ctrl_Reg_1.OC_ADJ_SET = DRV8301_VdsLevel_0p730_V;
+    local_regs->Ctrl_Reg_1.OC_ADJ_SET = DRV8301_VdsLevel_1p043_V;
     local_regs->Ctrl_Reg_2.GAIN = gain_snap_down->second;
 
     local_regs->SndCmd = true;
@@ -142,13 +142,13 @@ void Motor::set_error(Motor::Error error){
     error_ |= error;
     axis_->error_ |= Axis::ERROR_MOTOR_FAILED;
     safety_critical_disarm_motor_pwm(*this);
-    odrv.debug_var_ |= 0x00000004;
+    ODRIVE_DEBUG_DISARM(0x00000004);
     update_brake_current();
 }
 
 bool Motor::do_checks() {
     if (!check_DRV_fault()) {
-        odrv.debug_error_ |= 0x00000001;
+        ODRIVE_DEBUG_SETERROR(0x00000001);
         set_error(ERROR_DRV_FAULT);
         return false;
     }
@@ -223,7 +223,7 @@ bool Motor::measure_phase_resistance(float test_current, float max_voltage) {
         float Ialpha = -(current_meas_.phB + current_meas_.phC);
         test_voltage += (kI * current_meas_period) * (test_current - Ialpha);
         if (test_voltage > max_voltage || test_voltage < -max_voltage) {
-            odrv.debug_error_ |= 0x00000002;
+            ODRIVE_DEBUG_SETERROR(0x00000002);
             set_error(ERROR_PHASE_RESISTANCE_OUT_OF_RANGE);
             return false;
         }
@@ -280,7 +280,7 @@ bool Motor::measure_phase_inductance(float voltage_low, float voltage_high) {
     config_.phase_inductance = L;
     // TODO arbitrary values set for now
     if (L < 2e-6f || L > 4000e-6f) {
-        odrv.debug_error_ |= 0x00000004;
+        ODRIVE_DEBUG_SETERROR(0x00000004);
         set_error(ERROR_PHASE_INDUCTANCE_OUT_OF_RANGE);
         return false;
     }
@@ -311,7 +311,7 @@ bool Motor::run_calibration() {
 bool Motor::enqueue_modulation_timings(float mod_alpha, float mod_beta) {
     float tA, tB, tC;
     if (SVM(mod_alpha, mod_beta, &tA, &tB, &tC) != 0) {
-        odrv.debug_error_ |= 0x00000008;
+        ODRIVE_DEBUG_SETERROR(0x00000008);
         set_error(ERROR_MODULATION_MAGNITUDE);
         return false;
     }
@@ -350,7 +350,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 
     // Check for current sense saturation
     if (std::abs(current_meas_.phB) > ictrl.overcurrent_trip_level || std::abs(current_meas_.phC) > ictrl.overcurrent_trip_level) {
-        odrv.debug_error_ |= 0x00000010;
+        ODRIVE_DEBUG_SETERROR(0x00000010);
         set_error(ERROR_CURRENT_SENSE_SATURATION);
         return false;
     }
@@ -374,7 +374,7 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
 #else
     if (SQ(Id) + SQ(Iq) > SQ(I_trip)) {
 #endif
-        odrv.debug_error_ |= 0x00000020;
+        ODRIVE_DEBUG_SETERROR(0x00000020);
         set_error(ERROR_CURRENT_LIMIT_VIOLATION);
         return false;
     }
@@ -417,11 +417,9 @@ bool Motor::FOC_current(float Id_des, float Iq_des, float I_phase, float pwm_pha
     }
 
     // Compute estimated bus current
-#ifdef USER_CUSTOM_MOTOR_CODE_6
-    ictrl.Ibus = mod_d * ictrl.Id_measured + mod_q * ictrl.Iq_measured;
-#else
+    // Keep the brake resistor estimate on the latest current-loop samples;
+    // current-limit checking uses its separate filtered path.
     ictrl.Ibus = mod_d * Id + mod_q * Iq;
-#endif
 
     // Inverse park transform
     float c_p = our_arm_cos_f32(pwm_phase);
@@ -526,7 +524,7 @@ bool Motor::update(float torque_setpoint, float phase, float phase_vel) {
         case MOTOR_TYPE_ACIM: return FOC_current(id, iq, phase, pwm_phase); break;
         case MOTOR_TYPE_GIMBAL: return FOC_voltage(id, iq, pwm_phase); break;
         default:
-            odrv.debug_error_ |= 0x00000040;
+            ODRIVE_DEBUG_SETERROR(0x00000040);
             set_error(ERROR_NOT_IMPLEMENTED_MOTOR_TYPE);
             return false;
             break;

@@ -583,8 +583,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                 axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
                 axes[1]->motor_.user_error_ = 0;
             }
-            odrv.debug_error_ = 0;
-            odrv.debug_var_ = 0;
+            ODRIVE_DEBUG_CLEAR_FLAGS();
             break;
         case DRIVE__SET_VEL_PID:
             set_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
@@ -624,7 +623,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                 validAxis = true;
             } else {
                 // Duplicate can IDs, don't assign to any axis
-                odrv.debug_error_ |= 0x08000000;
+                ODRIVE_DEBUG_SETERROR(0x08000000);
                 odCAN->set_error(ODriveCAN::ERROR_DUPLICATE_CAN_IDS);
                 validAxis = false;
                 break;

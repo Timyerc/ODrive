@@ -145,10 +145,10 @@ bool get_debug_value(uint8_t code, int32_t* value) {
             *value = static_cast<int32_t>(axes[1]->motor_.current_meas_.phC * 1000.0f);
             return true;
         case CUSTOM_4:
-            *value = static_cast<int32_t>(odrv.debug_var_);
+            *value = static_cast<int32_t>(ODRIVE_DEBUG_DISARM_VALUE());
             return true;
         case CUSTOM_5:
-            *value = static_cast<int32_t>(odrv.debug_error_);
+            *value = static_cast<int32_t>(ODRIVE_DEBUG_SETERROR_VALUE());
             return true;
         case CUSTOM_6:
         case CUSTOM_7:

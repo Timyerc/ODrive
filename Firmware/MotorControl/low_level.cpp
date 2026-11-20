@@ -100,7 +100,7 @@ void low_level_fault(Motor::Error error) {
     // Disable all motors NOW!
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         safety_critical_disarm_motor_pwm(axes[i]->motor_);
-            odrv.debug_var_ |= 0x00000008;
+            ODRIVE_DEBUG_DISARM(0x00000008);
         axes[i]->motor_.error_ |= error;
     }
 
@@ -166,7 +166,7 @@ void safety_critical_apply_motor_pwm_timings(Motor& motor, uint16_t timings[3]) 
     } else {
         // unknown state oh no
         safety_critical_disarm_motor_pwm(motor);
-        odrv.debug_var_ |= 0x00000010;
+        ODRIVE_DEBUG_DISARM(0x00000010);
     }
     cpu_exit_critical(mask);
 }
@@ -191,7 +191,7 @@ void safety_critical_disarm_brake_resistor() {
     htim2.Instance->CCR4 = TIM_APB1_PERIOD_CLOCKS + 1;
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         safety_critical_disarm_motor_pwm(axes[i]->motor_);
-        odrv.debug_var_ |= 0x00000020;
+        ODRIVE_DEBUG_DISARM(0x00000020);
     }
     cpu_exit_critical(mask);
 }
@@ -257,7 +257,7 @@ void start_adc_pwm() {
     // Disarm motors and arm brake resistor
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         safety_critical_disarm_motor_pwm(axes[i]->motor_);
-        odrv.debug_var_ |= 0x00000040;
+        ODRIVE_DEBUG_DISARM(0x00000040);
     }
     safety_critical_arm_brake_resistor();
 }
@@ -477,12 +477,6 @@ void vbus_sense_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
     // Only one conversion in sequence, so only rank1
     uint32_t ADCValue = HAL_ADCEx_InjectedGetValue(hadc, ADC_INJECTED_RANK_1);
     vbus_voltage = ADCValue * voltage_scale;
-#ifdef USER_CUSTOM_MOTOR_CODE_6
-    if (vbus_voltage < odrv.config_.dc_bus_undervoltage_trip_level)
-        vbus_voltage = odrv.config_.dc_bus_undervoltage_trip_level;
-    if (vbus_voltage > odrv.config_.dc_bus_overvoltage_trip_level)
-        vbus_voltage = odrv.config_.dc_bus_overvoltage_trip_level;
-#endif
 }
 
 static void decode_hall_samples(Encoder& enc, uint16_t GPIO_samples[num_GPIO]) {
@@ -567,7 +561,7 @@ void pwm_trig_adc_cb(ADC_HandleTypeDef* hadc, bool injected) {
             bool was_armed = safety_critical_disarm_motor_pwm(other_axis.motor_);
             if (was_armed) {
                 other_axis.motor_.error_ |= Motor::ERROR_CONTROL_DEADLINE_MISSED;
-                odrv.debug_var_ |= 0x00000080;
+                ODRIVE_DEBUG_DISARM(0x00000080);
             }
         } else {
             other_axis.motor_.next_timings_valid_ = false;
