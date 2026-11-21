@@ -151,7 +151,15 @@ bool get_debug_value(uint8_t code, int32_t* value) {
             *value = static_cast<int32_t>(ODRIVE_DEBUG_SETERROR_VALUE());
             return true;
         case CUSTOM_6:
+            if (!axes[0])
+                return false;
+            *value = static_cast<int32_t>(axes[0]->motor_.gate_driver_exported_.drv_fault);
+            return true;
         case CUSTOM_7:
+            if (!axes[1])
+                return false;
+            *value = static_cast<int32_t>(axes[1]->motor_.gate_driver_exported_.drv_fault);
+            return true;
         case CUSTOM_8:
         case CUSTOM_9:
             *value = code;
