@@ -3,34 +3,6 @@
 #include "interface_uart.h"
 #include <odrive_main.h>
 
-#define READ 0
-#define ODRV_VBAT 101
-#define ODRV_IBUS 102
-#define ODRV_M0_IBUS 103
-#define ODRV_M1_IBUS 104
-#define ODRV_TEMP 105
-#define ODRV_M0_TEMP 106
-#define ODRV_M1_TEMP 107
-#define ODRV_M0_SPEED 108
-#define ODRV_M1_SPEED 109
-#define ODRV_M0_HALL 110
-#define ODRV_M1_HALL 111
-#define ODRV_M0_ANGLE 112
-#define ODRV_M1_ANGLE 113
-#define ODRV_AIBUS 114
-#define ODRV_M0_AIBUS 115
-#define ODRV_M1_AIBUS 116
-#define CUSTOM_0 200
-#define CUSTOM_1 201
-#define CUSTOM_2 202
-#define CUSTOM_3 203
-#define CUSTOM_4 204
-#define CUSTOM_5 205
-#define CUSTOM_6 206
-#define CUSTOM_7 207
-#define CUSTOM_8 208
-#define CUSTOM_9 209
-
 extern int32_t m0_absoluteValue;
 extern int32_t m1_absoluteValue;
 extern int32_t ibus_absoluteValue;
@@ -61,6 +33,8 @@ uint32_t read_u32_be(const uint8_t* data) {
            (static_cast<uint32_t>(data[2]) << 8) |
            static_cast<uint32_t>(data[3]);
 }
+
+}  // namespace
 
 bool get_debug_value(uint8_t code, int32_t* value) {
     switch (code) {
@@ -168,6 +142,8 @@ bool get_debug_value(uint8_t code, int32_t* value) {
             return false;
     }
 }
+
+namespace {
 
 void send_response(uint8_t code, int32_t value) {
     if (!uart4_stream_output_ptr)

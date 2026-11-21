@@ -3,6 +3,7 @@
 #include <odrive_main.h>
 
 #include <cstring>
+#include "controller.hpp"  // 或者 MotorControl/controller.hpp
 
 #define USE_USER_CAN_CALLBACKS 1  // 使用自定义CAN回调函数
 #define ODRIVE_CUR_DEBUG 0        // 开启电流调试功能
@@ -121,6 +122,20 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[2] = axis->error_ >> 16;
         txmsg.buf[3] = axis->error_ >> 8;
         txmsg.buf[4] = axis->error_;
+    } else if(axes[0]->motor_.gate_driver_exported_.drv_fault) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x06;  // 驱动故障
+        txmsg.buf[1] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 24;
+        txmsg.buf[2] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 16;
+        txmsg.buf[3] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 8;
+        txmsg.buf[4] = axes[0]->motor_.gate_driver_exported_.drv_fault;
+    } else if((axes[1]->motor_.gate_driver_exported_.drv_fault)) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x07;  // 驱动故障
+        txmsg.buf[1] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 24;
+        txmsg.buf[2] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 16;
+        txmsg.buf[3] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 8;
+        txmsg.buf[4] = axes[1]->motor_.gate_driver_exported_.drv_fault;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
@@ -489,7 +504,7 @@ void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,
     odrv.reboot();
 }
 
-#include "controller.hpp"  // 或者 MotorControl/controller.hpp
+
 /**
  * @brief Parse and dispatch custom CAN application commands.
  * @param msg Incoming CAN frame.
@@ -502,7 +517,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
-        alive = 0;                 // 收到消息，清零保活计数
+        alive = 0;// 收到消息，清零保活计数
     } else if (msg.id == 0x123) {  // debug
         odrive_debug(msg);
         axes[0]->watchdog_feed();
