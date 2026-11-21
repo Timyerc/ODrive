@@ -1,8 +1,9 @@
-#include "can_simple.hpp"
 
+#include "can_simple.hpp"
 #include <odrive_main.h>
 
 #include <cstring>
+#include "controller.hpp"  // 或者 MotorControl/controller.hpp
 
 #define USE_USER_CAN_CALLBACKS 1  // 使用自定义CAN回调函数
 #define ODRIVE_CUR_DEBUG 0        // 开启电流调试功能
@@ -95,32 +96,46 @@ bool CANSimple::sendMotorSpeed(Axis* axis, uint32_t motorNum) {
         txmsg.buf[4] = axis->motor_.error_;
     } else if (axis->encoder_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x05;  // 霍尔故障
+        txmsg.buf[0] = 0x05;  // 编码器故障
         txmsg.buf[1] = axis->encoder_.error_ >> 24;
         txmsg.buf[2] = axis->encoder_.error_ >> 16;
         txmsg.buf[3] = axis->encoder_.error_ >> 8;
         txmsg.buf[4] = axis->encoder_.error_;
     } else if (axis->sensorless_estimator_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x03;  // 电机过流
+        txmsg.buf[0] = 0x03;  // 传感器无速度估计故障
         txmsg.buf[1] = axis->sensorless_estimator_.error_ >> 24;
         txmsg.buf[2] = axis->sensorless_estimator_.error_ >> 16;
         txmsg.buf[3] = axis->sensorless_estimator_.error_ >> 8;
         txmsg.buf[4] = axis->sensorless_estimator_.error_;
     } else if (axis->controller_.error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x01;  //
+        txmsg.buf[0] = 0x01;  // 控制器故障
         txmsg.buf[1] = axis->controller_.error_ >> 24;
         txmsg.buf[2] = axis->controller_.error_ >> 16;
         txmsg.buf[3] = axis->controller_.error_ >> 8;
         txmsg.buf[4] = axis->controller_.error_;
     } else if (axis->error_) {
         txmsg.len = 5;
-        txmsg.buf[0] = 0x02;  //
+        txmsg.buf[0] = 0x02;  // 总线故障
         txmsg.buf[1] = axis->error_ >> 24;
         txmsg.buf[2] = axis->error_ >> 16;
         txmsg.buf[3] = axis->error_ >> 8;
         txmsg.buf[4] = axis->error_;
+    } else if(axes[0]->motor_.gate_driver_exported_.drv_fault) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x06;  // 驱动故障
+        txmsg.buf[1] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 24;
+        txmsg.buf[2] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 16;
+        txmsg.buf[3] = axes[0]->motor_.gate_driver_exported_.drv_fault >> 8;
+        txmsg.buf[4] = axes[0]->motor_.gate_driver_exported_.drv_fault;
+    } else if((axes[1]->motor_.gate_driver_exported_.drv_fault)) {
+        txmsg.len = 5;
+        txmsg.buf[0] = 0x07;  // 驱动故障
+        txmsg.buf[1] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 24;
+        txmsg.buf[2] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 16;
+        txmsg.buf[3] = axes[1]->motor_.gate_driver_exported_.drv_fault >> 8;
+        txmsg.buf[4] = axes[1]->motor_.gate_driver_exported_.drv_fault;
     } else {
         txmsg.len = 5;
         txmsg.buf[0] = 0x09;  // 正常状态
@@ -215,6 +230,39 @@ void CANSimple::hot_plugging_error_handing(void) {
     }
 }
 
+uint8_t m0_over_current_count = 0;
+uint8_t m1_over_current_count = 0;
+
+//标记电机过流错误
+void CANSimple::motor_overload_status(void) {
+    m0_over_current_count = 10;  // 锁定转速设置
+    m1_over_current_count = 10;  // 锁定转速设置
+    axes[0]->motor_.user_error_ |= ERROR_M0_DC_BUS_OVER_CURRENT;
+    axes[1]->motor_.user_error_ |= ERROR_M1_DC_BUS_OVER_CURRENT;
+}
+/**
+ * @brief Handle motor overload by clearing errors and resetting motor state.
+ */
+void CANSimple::motor_overload_recovery(void) {
+    if (axes[0]->motor_.user_error_ & ERROR_M0_DC_BUS_OVER_CURRENT) {
+        axes[0]->clear_errors();
+        axes[0]->controller_.input_vel_ = 0;
+        axes[0]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        axes[0]->motor_.user_error_ = 0;
+    }
+    if (axes[1]->motor_.user_error_ & ERROR_M1_DC_BUS_OVER_CURRENT) {
+        axes[1]->clear_errors();
+        axes[1]->controller_.input_vel_ = 0;
+        axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
+        axes[1]->motor_.user_error_ = 0;
+    }
+    if (m0_over_current_count > 0) {
+        m0_over_current_count --;
+    }
+    if (m1_over_current_count > 0) {
+        m1_over_current_count --;
+    }
+}
 int32_t m0_absoluteValue;    // 毫安
 int32_t m1_absoluteValue;    // 毫安
 int32_t ibus_absoluteValue;  // 毫安
@@ -299,6 +347,7 @@ void CANSimple::keepAlive(Axis* axis) {
     motor_overload_output();       // 电流过载保护输出
     hall_error_handing();          // 霍尔状态检测
     hot_plugging_error_handing();  // 热插拔错误
+    motor_overload_recovery();  // 过流错误恢复
 #if ODRIVE_CAN_TEST
     can_Message_t txmsg;
     txmsg.id = axis->config_.can_node_id << NUM_CMD_ID_BITS;
@@ -455,7 +504,7 @@ void CANSimple::set_motor_max_speed_limit(uint8_t msg_id, uint16_t m0_max_speed,
     odrv.reboot();
 }
 
-#include "controller.hpp"  // 或者 MotorControl/controller.hpp
+
 /**
  * @brief Parse and dispatch custom CAN application commands.
  * @param msg Incoming CAN frame.
@@ -468,7 +517,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     if (msg.id == axes[0]->config_.can_node_id || msg.id == axes[1]->config_.can_node_id) {
         axes[0]->watchdog_feed();
         axes[1]->watchdog_feed();
-        alive = 0;                 // 收到消息，清零保活计数
+        alive = 0;// 收到消息，清零保活计数
     } else if (msg.id == 0x123) {  // debug
         odrive_debug(msg);
         axes[0]->watchdog_feed();
@@ -484,10 +533,17 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
             // Odrive转速以秒为单位，默认最大50转每秒，需要做一个转换
             command.leftSpeed = readDate16(msg, 8);
             command.rightSpeed = readDate16(msg, 24);
-            axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit / 32768;   // 进行速度换算
-            axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit / 32768;  // 进行速度换算
-            // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
-            // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+
+            if(m0_over_current_count == 0 && m1_over_current_count == 0) {
+                axes[0]->controller_.input_vel_ = (command.leftSpeed - 32768) * axes[0]->config_.max_speed_limit / 32768;   // 进行速度换算
+                axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->config_.max_speed_limit / 32768;  // 进行速度换算
+                // axes[0]->controller_.input_vel_ = (command.leftSpeed  - 32768) * axes[0]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+                // axes[1]->controller_.input_vel_ = (command.rightSpeed - 32768) * axes[1]->controller_.config_.vel_limit  / 32768;  // 进行速度换算
+            }
+            else {
+                axes[0]->controller_.input_vel_ = 0;
+                axes[1]->controller_.input_vel_ = 0;
+            }
             break;
 
         case DRIVE_COMMAND0_GET_SPEED:  // 速度查询06
@@ -507,9 +563,16 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                     sendMotorSpeed(axes[1], 0x13);
                 }
             }
+            if(m0_over_current_count != 0 || m1_over_current_count != 0) {
+                axes[0]->controller_.input_vel_ = 0;
+                axes[1]->controller_.input_vel_ = 0;
+            }
             break;
         case DRIVE_COMMAND0_READ_CURRENT:  // 电流读取
             sendMotorCurrent(axes[0]->config_.can_node_id, command.cmd, readDate8(msg, 8));
+            break;
+        case DRIVE_MANUAL_TRIGGER_ERROR:  // 手动触发错误
+            motor_overload_status();
             break;
         case DRIVE__SET_CURRENT_THRESHOLD:  // 设置电机电流阈值
             set_motor_current_threshold(readDate8(msg, 8), DRIVE__SET_CURRENT_THRESHOLD, readDate16(msg, 16), readDate16(msg, 32));
@@ -535,6 +598,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                 axes[1]->requested_state_ = Axis::AXIS_STATE_CLOSED_LOOP_CONTROL;
                 axes[1]->motor_.user_error_ = 0;
             }
+            ODRIVE_DEBUG_CLEAR_FLAGS();
             break;
         case DRIVE__SET_VEL_PID:
             set_motor_vel_pid(readDate8(msg, 8), readDate16(msg, 16), readDate16(msg, 32));
@@ -574,6 +638,7 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
                 validAxis = true;
             } else {
                 // Duplicate can IDs, don't assign to any axis
+                ODRIVE_DEBUG_SETERROR(0x08000000);
                 odCAN->set_error(ODriveCAN::ERROR_DUPLICATE_CAN_IDS);
                 validAxis = false;
                 break;
@@ -584,84 +649,82 @@ void CANSimple::handle_can_message(can_Message_t& msg) {
     if (validAxis) {
         axis->watchdog_feed();
         switch (cmd) {
-#if 0
-        case MSG_CO_NMT_CTRL:
-            break;
-        case MSG_CO_HEARTBEAT_CMD:
-            break;
-        case MSG_ODRIVE_HEARTBEAT:
-            // We don't currently do anything to respond to ODrive heartbeat messages
-            break;
-        case MSG_ODRIVE_ESTOP:
-            estop_callback(axis, msg);
-            break;
-        case MSG_GET_MOTOR_ERROR:
-            get_motor_error_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_ERROR:
-            get_encoder_error_callback(axis, msg);
-            break;
-        case MSG_GET_SENSORLESS_ERROR:
-            get_sensorless_error_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_NODE_ID:
-            set_axis_nodeid_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_REQUESTED_STATE:
-            set_axis_requested_state_callback(axis, msg);
-            break;
-        case MSG_SET_AXIS_STARTUP_CONFIG:
-            set_axis_startup_config_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_ESTIMATES:
-            get_encoder_estimates_callback(axis, msg);
-            break;
-        case MSG_GET_ENCODER_COUNT:
-            get_encoder_count_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_POS:
-            set_input_pos_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_VEL:
-            set_input_vel_callback(axis, msg);
-            break;
-        case MSG_SET_INPUT_TORQUE:
-            set_input_torque_callback(axis, msg);
-            break;
-        case MSG_SET_CONTROLLER_MODES:
-            set_controller_modes_callback(axis, msg);
-            break;
-        case MSG_SET_VEL_LIMIT:
-            set_vel_limit_callback(axis, msg);
-            break;
-        case MSG_START_ANTICOGGING:
-            start_anticogging_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_INERTIA:
-            set_traj_inertia_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_ACCEL_LIMITS:
-            set_traj_accel_limits_callback(axis, msg);
-            break;
-        case MSG_SET_TRAJ_VEL_LIMIT:
-            set_traj_vel_limit_callback(axis, msg);
-            break;
-        case MSG_GET_IQ:
-            get_iq_callback(axis, msg);
-            break;
-        case MSG_GET_SENSORLESS_ESTIMATES:
-            get_sensorless_estimates_callback(axis, msg);
-            break;
-        case MSG_RESET_ODRIVE:
-            NVIC_SystemReset();
-            break;
-        case MSG_GET_VBUS_VOLTAGE:
-            get_vbus_voltage_callback(axis, msg);
-            break;
-        case MSG_CLEAR_ERRORS:
-            clear_errors_callback(axis, msg);
-            break;
-#endif
+            case MSG_CO_NMT_CTRL:
+                break;
+            case MSG_CO_HEARTBEAT_CMD:
+                break;
+            case MSG_ODRIVE_HEARTBEAT:
+                // We don't currently do anything to respond to ODrive heartbeat messages
+                break;
+            case MSG_ODRIVE_ESTOP:
+                estop_callback(axis, msg);
+                break;
+            case MSG_GET_MOTOR_ERROR:
+                get_motor_error_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_ERROR:
+                get_encoder_error_callback(axis, msg);
+                break;
+            case MSG_GET_SENSORLESS_ERROR:
+                get_sensorless_error_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_NODE_ID:
+                set_axis_nodeid_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_REQUESTED_STATE:
+                set_axis_requested_state_callback(axis, msg);
+                break;
+            case MSG_SET_AXIS_STARTUP_CONFIG:
+                set_axis_startup_config_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_ESTIMATES:
+                get_encoder_estimates_callback(axis, msg);
+                break;
+            case MSG_GET_ENCODER_COUNT:
+                get_encoder_count_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_POS:
+                set_input_pos_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_VEL:
+                set_input_vel_callback(axis, msg);
+                break;
+            case MSG_SET_INPUT_TORQUE:
+                set_input_torque_callback(axis, msg);
+                break;
+            case MSG_SET_CONTROLLER_MODES:
+                set_controller_modes_callback(axis, msg);
+                break;
+            case MSG_SET_VEL_LIMIT:
+                set_vel_limit_callback(axis, msg);
+                break;
+            case MSG_START_ANTICOGGING:
+                start_anticogging_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_INERTIA:
+                set_traj_inertia_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_ACCEL_LIMITS:
+                set_traj_accel_limits_callback(axis, msg);
+                break;
+            case MSG_SET_TRAJ_VEL_LIMIT:
+                set_traj_vel_limit_callback(axis, msg);
+                break;
+            case MSG_GET_IQ:
+                get_iq_callback(axis, msg);
+                break;
+            case MSG_GET_SENSORLESS_ESTIMATES:
+                get_sensorless_estimates_callback(axis, msg);
+                break;
+            case MSG_RESET_ODRIVE:
+                NVIC_SystemReset();
+                break;
+            case MSG_GET_VBUS_VOLTAGE:
+                get_vbus_voltage_callback(axis, msg);
+                break;
+            case MSG_CLEAR_ERRORS:
+                clear_errors_callback(axis, msg);
+                break;
             default:
                 break;
         }

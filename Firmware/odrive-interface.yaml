@@ -187,6 +187,12 @@ interfaces:
       axis1: {type: Axis, c_name: get_axis(1)}
       can: {type: Can, c_name: get_can()}
       test_property: uint32
+      debug_disarm:
+        type: uint32
+        doc: Debug variable for development purposes.
+      debug_seterror:
+        type: uint32
+        doc: Debug variable for development purposes.
         
     functions:
       test_function: {in: {delta: int32}, out: {cnt: int32}}

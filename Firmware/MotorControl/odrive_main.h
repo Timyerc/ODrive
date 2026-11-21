@@ -1,6 +1,10 @@
 #ifndef __ODRIVE_MAIN_H
 #define __ODRIVE_MAIN_H
 
+#ifndef ODRIVE_ENABLE_DEBUG_FLAGS
+#define ODRIVE_ENABLE_DEBUG_FLAGS 1
+#endif
+
 // Note on central include scheme by Samuel:
 // there are circular dependencies between some of the header files,
 // e.g. the Motor header needs a forward declaration of Axis and vice versa
@@ -288,9 +292,31 @@ public:
     bool user_config_loaded_;
 
     uint32_t test_property_ = 0;
+#if ODRIVE_ENABLE_DEBUG_FLAGS
+    uint32_t debug_disarm_ = 0;
+    uint32_t debug_seterror_ = 0;
+#endif
 };
 
 extern ODrive odrv; // defined in main.cpp
+
+#if ODRIVE_ENABLE_DEBUG_FLAGS
+#define ODRIVE_DEBUG_SETERROR(mask) (odrv.debug_seterror_ |= (mask))
+#define ODRIVE_DEBUG_DISARM(mask) (odrv.debug_disarm_ |= (mask))
+#define ODRIVE_DEBUG_CLEAR_FLAGS() \
+    do { \
+        odrv.debug_seterror_ = 0; \
+        odrv.debug_disarm_ = 0; \
+    } while (0)
+#define ODRIVE_DEBUG_SETERROR_VALUE() (odrv.debug_seterror_)
+#define ODRIVE_DEBUG_DISARM_VALUE() (odrv.debug_disarm_)
+#else
+#define ODRIVE_DEBUG_SETERROR(mask) ((void)0)
+#define ODRIVE_DEBUG_DISARM(mask) ((void)0)
+#define ODRIVE_DEBUG_CLEAR_FLAGS() ((void)0)
+#define ODRIVE_DEBUG_SETERROR_VALUE() 0u
+#define ODRIVE_DEBUG_DISARM_VALUE() 0u
+#endif
 
 #endif // __cplusplus
 

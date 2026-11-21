@@ -459,6 +459,7 @@ bool Axis::run_idle_loop() {
     // run_control_loop ignores missed modulation timing updates
     // if and only if we're in AXIS_STATE_IDLE
     safety_critical_disarm_motor_pwm(motor_);
+    ODRIVE_DEBUG_DISARM(0x00000001);
     set_step_dir_active(config_.enable_step_dir && config_.step_dir_always_on);
     run_control_loop([this]() {
         return true;

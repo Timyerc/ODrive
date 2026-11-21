@@ -1,5 +1,6 @@
 
 #include "interface_uart.h"
+#include "odrive_debug.hpp"
 
 #include "ascii_protocol.hpp"
 
@@ -10,8 +11,14 @@
 #include <cmsis_os.h>
 #include <freertos_vars.h>
 
+#include <odrive_main.h>
+
 #define UART_TX_BUFFER_SIZE 64
 #define UART_RX_BUFFER_SIZE 64
+
+// Periodic UART TX frame: 20 bytes, header 0x5A 0x5A, every 200 ms
+#define UART_TX_FRAME_SIZE 20
+#define UART_TX_PERIOD_MS 200
 
 // DMA open loop continous circular buffer
 // 1ms delay periodic, chase DMA ptr around
@@ -58,6 +65,17 @@ StreamBasedPacketSink uart4_packet_output(uart4_stream_output);
 BidirectionalPacketBasedChannel uart4_channel(uart4_packet_output);
 StreamToPacketSegmenter uart4_stream_input(uart4_channel);
 
+static void process_uart_bytes(const uint8_t* buffer, size_t length) {
+    uint8_t passthrough[UART_RX_BUFFER_SIZE + 10];
+    size_t passthrough_length = debug_process_uart_bytes(
+            buffer, length, passthrough, sizeof(passthrough));
+    if (passthrough_length == 0)
+        return;
+
+    uart4_stream_input.process_bytes(passthrough, passthrough_length, nullptr);
+    ASCII_protocol_parse_stream(passthrough, passthrough_length, uart4_stream_output);
+}
+
 static void uart_server_thread(void * ctx) {
     (void) ctx;
 
@@ -79,17 +97,13 @@ static void uart_server_thread(void * ctx) {
         // deadline_ms = timeout_to_deadline(PROTOCOL_SERVER_TIMEOUT_MS);
         // Process bytes in one or two chunks (two in case there was a wrap)
         if (new_rcv_idx < dma_last_rcv_idx) {
-            uart4_stream_input.process_bytes(dma_rx_buffer + dma_last_rcv_idx,
-                    UART_RX_BUFFER_SIZE - dma_last_rcv_idx, nullptr); // TODO: use process_all
-            ASCII_protocol_parse_stream(dma_rx_buffer + dma_last_rcv_idx,
-                    UART_RX_BUFFER_SIZE - dma_last_rcv_idx, uart4_stream_output);
+            process_uart_bytes(dma_rx_buffer + dma_last_rcv_idx,
+                    UART_RX_BUFFER_SIZE - dma_last_rcv_idx);
             dma_last_rcv_idx = 0;
         }
         if (new_rcv_idx > dma_last_rcv_idx) {
-            uart4_stream_input.process_bytes(dma_rx_buffer + dma_last_rcv_idx,
-                    new_rcv_idx - dma_last_rcv_idx, nullptr); // TODO: use process_all
-            ASCII_protocol_parse_stream(dma_rx_buffer + dma_last_rcv_idx,
-                    new_rcv_idx - dma_last_rcv_idx, uart4_stream_output);
+            process_uart_bytes(dma_rx_buffer + dma_last_rcv_idx,
+                    new_rcv_idx - dma_last_rcv_idx);
             dma_last_rcv_idx = new_rcv_idx;
         }
     };
@@ -105,6 +119,7 @@ void start_uart_server() {
     // Start UART communication thread
     osThreadDef(uart_server_thread_def, uart_server_thread, osPriorityNormal, 0, stack_size_uart_thread / sizeof(StackType_t) /* the ascii protocol needs considerable stack space */);
     uart_thread = osThreadCreate(osThread(uart_server_thread_def), NULL);
+
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef* huart) {
