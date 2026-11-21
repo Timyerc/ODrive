@@ -1,5 +1,5 @@
-#ifndef __DEBUG_HPP
-#define __DEBUG_HPP
+#ifndef __ODRIVE_DEBUG_HPP
+#define __ODRIVE_DEBUG_HPP
 
 #include <stddef.h>
 #include <stdint.h>

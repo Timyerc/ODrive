@@ -88,15 +88,6 @@ static uint16_t GPIO_port_samples [2][num_GPIO];
 
 // @brief Floats ALL phases immediately and disarms both motors and the brake resistor.
 void low_level_fault(Motor::Error error) {
-    // static uint32_t error_cnt = 0;
-    // if (error == Motor::ERROR_CURRENT_SENSE_SATURATION || error == Motor::ERROR_CURRENT_LIMIT_VIOLATION || error == Motor::ERROR_DC_BUS_OVER_REGEN_CURRENT) {
-    //     if (error_cnt < 10) {
-    //         error_cnt++;
-    //         return;
-    //     }
-    // } else {
-    //     error_cnt = 0;
-    // }
     // Disable all motors NOW!
     for (size_t i = 0; i < AXIS_COUNT; ++i) {
         safety_critical_disarm_motor_pwm(axes[i]->motor_);

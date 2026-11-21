@@ -1,6 +1,6 @@
 
 #include "interface_uart.h"
-#include "debug.hpp"
+#include "odrive_debug.hpp"
 
 #include "ascii_protocol.hpp"
 
