@@ -10,6 +10,7 @@
 
 // Specific CAN Protocols
 #include "can_simple.hpp"
+#include "bootloader.hpp"
 
 // Safer context handling via maps instead of arrays
 // #include <unordered_map>
@@ -31,6 +32,12 @@ void ODriveCAN::can_server_thread() {
             osSemaphoreWait(sem_can, 10);  // Poll every 10ms regardless of sempahore status
             while (available()) {
                 read(rxmsg);
+                can_Message_t response;
+                if (FirmwareDownload::handle(rxmsg, response)) {
+                    if (response.len > 0)
+                        write(response);
+                    continue;
+                }
                 switch (config_.protocol) {
                     case PROTOCOL_SIMPLE:
                         CANSimple::handle_can_message(rxmsg);
