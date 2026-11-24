@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "communication/can_helpers.hpp"
-
 #define BASE_ADDRESS        0x08000000
 #define SECTOR_0_START      (BASE_ADDRESS)
 #define SECTOR_1_START      (SECTOR_0_START + 0x4000)
@@ -32,15 +30,42 @@
 #define APPLICATION_CONFIG_B_START   SECTOR_11_START
 #define APPLICATION_CONFIG_SIZE      (SECTOR_11_START - SECTOR_10_START)
 
-namespace FirmwareDownload {
+constexpr uint32_t OTA_METADATA_MAGIC = 0x4F54414D;
+constexpr uint32_t OTA_CONFIG_MAGIC = 0x4346474D;
+constexpr uint32_t OTA_METADATA_FORMAT = 2;
+constexpr uint32_t OTA_STATE_EMPTY = 0xFFFFFFFF;
+constexpr uint32_t OTA_STATE_PENDING = 0xFFFFFFFE;
+constexpr uint32_t OTA_STATE_INSTALLED = 0xFFFFFFFC;
+constexpr uint32_t OTA_STATE_FAILED = 0xFFFFFFF8;
+constexpr uint32_t OTA_CHUNK_SIZE = 1024;
+constexpr uint32_t OTA_MAX_FIRMWARE_SIZE = APPLICATION_SIZE;
+constexpr uint32_t OTA_MIN_APP_SIZE = 200 * 1024;
+constexpr uint32_t OTA_MAX_CHUNKS =
+    (OTA_MAX_FIRMWARE_SIZE + OTA_CHUNK_SIZE - 1) / OTA_CHUNK_SIZE;
+
+struct OtaMetadata {
+    uint32_t magic;
+    uint32_t format;
+    uint32_t image_type;
+    uint32_t firmware_size;
+    uint32_t firmware_crc32;
+    uint32_t chunk_count;
+    uint32_t metadata_crc32;
+    uint32_t state;
+};
+
+static_assert(sizeof(OtaMetadata) == 32, "OTA metadata layout must be 32 bytes");
+
+namespace OtaCanProtocol {
 
 constexpr uint32_t CAN_ID = 0xABC;
-constexpr uint32_t CHUNK_SIZE = 1024;
-constexpr uint32_t DATA_FRAME_COUNT = (CHUNK_SIZE + 5) / 6;
-constexpr uint32_t MAX_CHUNKS = APPLICATION_BUFFER_SIZE / CHUNK_SIZE;
 constexpr uint8_t FRAME_START = 0x01;
 constexpr uint8_t FRAME_DATA = 0x02;
 constexpr uint8_t FRAME_END = 0x03;
+constexpr uint8_t FRAME_UPGRADE_REQUEST = 0x10;
+constexpr uint8_t FRAME_STATUS_REQUEST = 0x11;
+constexpr uint8_t FRAME_METADATA = 0x12;
+enum ImageType : uint8_t { APPLICATION = 1, PARAMETERS = 2 };
 constexpr uint8_t FRAME_ACK = 0x80;
 
 enum Status : uint8_t {
@@ -51,11 +76,28 @@ enum Status : uint8_t {
     STATUS_SEQUENCE_ERROR = 4,
     STATUS_SIZE_ERROR = 5,
     STATUS_FLASH_ERROR = 6,
-    STATUS_COMPLETE = 7
+    STATUS_COMPLETE = 7,
+    STATUS_ALREADY_CURRENT = 8,
+    STATUS_STOPPING = 9,
+    STATUS_STOPPED = 10,
+    STATUS_IMAGE_CHECKSUM = 12,
+    STATUS_BUSY = 13,
+    STATUS_NEED_SIZE = 15
 };
 
-bool handle(const can_Message_t& message, can_Message_t& response);
+}
 
+inline bool valid_image_size(uint32_t type, uint32_t size) {
+    return type == OtaCanProtocol::APPLICATION
+        ? size >= OTA_MIN_APP_SIZE && size <= APPLICATION_SIZE
+        : type == OtaCanProtocol::PARAMETERS &&
+          size > 0 && size <= APPLICATION_CONFIG_SIZE;
+}
+
+inline bool valid_app_vectors(uint32_t sp, uint32_t entry, uint32_t size) {
+    return sp > 0x20000000 && sp <= 0x20020000 && (sp & 7) == 0 &&
+           (entry & 1) && (entry & ~1U) >= APPLICATION_START &&
+           (entry & ~1U) < APPLICATION_START + size;
 }
 
 #endif

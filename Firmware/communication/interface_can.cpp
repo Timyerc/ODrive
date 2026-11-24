@@ -10,7 +10,7 @@
 
 // Specific CAN Protocols
 #include "can_simple.hpp"
-#include "bootloader.hpp"
+#include "can_boot.hpp"
 
 // Safer context handling via maps instead of arrays
 // #include <unordered_map>
@@ -33,9 +33,18 @@ void ODriveCAN::can_server_thread() {
             while (available()) {
                 read(rxmsg);
                 can_Message_t response;
-                if (FirmwareDownload::handle(rxmsg, response)) {
+            if (FirmwareOTA::handle(rxmsg, response)) {
                     if (response.len > 0)
                         write(response);
+                if (FirmwareOTA::reset_after_response()) {
+                    for (uint32_t timeout = 0;
+                         timeout < 100 &&
+                         HAL_CAN_GetTxMailboxesFreeLevel(handle_) < 3;
+                         ++timeout) {
+                        osDelay(1);
+                    }
+                    NVIC_SystemReset();
+                }
                     continue;
                 }
                 switch (config_.protocol) {
