@@ -206,7 +206,7 @@ build{
         'communication/interface_uart.cpp',
         'communication/interface_usb.cpp',
         'communication/interface_can.cpp',
-        'communication/can_boot.cpp',
+        'communication/can_download.cpp',
         'communication/interface_i2c.cpp',
         'fibre/cpp/protocol.cpp',
         'FreeRTOS-openocd.c',

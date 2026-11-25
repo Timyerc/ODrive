@@ -13,8 +13,6 @@ constexpr uint32_t FLASH_ERROR_FLAGS =
 constexpr uint32_t FLASH_UNLOCK_KEY1 = 0x45670123;
 constexpr uint32_t FLASH_UNLOCK_KEY2 = 0xCDEF89AB;
 constexpr uint32_t FLASH_WAIT_LIMIT = 100000000;
-constexpr uint32_t SRAM_START = 0x20000000;
-constexpr uint32_t SRAM_END = 0x20020000;
 
 uint32_t crc32(const uint8_t* data, uint32_t length) {
     uint32_t crc = 0xFFFFFFFF;
@@ -81,7 +79,7 @@ bool valid_metadata(const OtaMetadata& metadata) {
                     metadata.image_type == OtaCanProtocol::PARAMETERS)) &&
            metadata.format == OTA_METADATA_FORMAT &&
            metadata.state == OTA_STATE_PENDING &&
-           valid_image_size(metadata.image_type, metadata.firmware_size) &&
+           image_fits_flash(metadata.image_type, metadata.firmware_size) &&
            metadata.chunk_count ==
                (metadata.firmware_size + OTA_CHUNK_SIZE - 1) / OTA_CHUNK_SIZE &&
            metadata.metadata_crc32 ==
@@ -94,9 +92,8 @@ bool valid_application_vectors(uint32_t address, uint32_t image_size) {
         return false;
     const volatile uint32_t* vectors =
         reinterpret_cast<const volatile uint32_t*>(address);
-    const uint32_t stack_pointer = vectors[0];
     const uint32_t reset_handler = vectors[1];
-    return valid_app_vectors(stack_pointer, reset_handler, image_size);
+    return valid_app_reset_entry(reset_handler);
 }
 
 bool set_metadata_state(uint32_t state) {
@@ -152,12 +149,8 @@ bool install_pending_image(const OtaMetadata& metadata) {
 bool application_vectors_present() {
     const volatile uint32_t* vectors =
         reinterpret_cast<const volatile uint32_t*>(APPLICATION_START);
-    const uint32_t stack_pointer = vectors[0];
     const uint32_t reset_handler = vectors[1];
-    return stack_pointer >= SRAM_START && stack_pointer <= SRAM_END &&
-           (reset_handler & 1U) != 0 &&
-           (reset_handler & ~1U) >= APPLICATION_START &&
-           (reset_handler & ~1U) < APPLICATION_START + APPLICATION_SIZE;
+    return valid_app_reset_entry(reset_handler);
 }
 
 void jump_to_application() {

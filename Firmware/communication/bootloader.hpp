@@ -39,7 +39,6 @@ constexpr uint32_t OTA_STATE_INSTALLED = 0xFFFFFFFC;
 constexpr uint32_t OTA_STATE_FAILED = 0xFFFFFFF8;
 constexpr uint32_t OTA_CHUNK_SIZE = 1024;
 constexpr uint32_t OTA_MAX_FIRMWARE_SIZE = APPLICATION_SIZE;
-constexpr uint32_t OTA_MIN_APP_SIZE = 200 * 1024;
 constexpr uint32_t OTA_MAX_CHUNKS =
     (OTA_MAX_FIRMWARE_SIZE + OTA_CHUNK_SIZE - 1) / OTA_CHUNK_SIZE;
 
@@ -59,12 +58,13 @@ static_assert(sizeof(OtaMetadata) == 32, "OTA metadata layout must be 32 bytes")
 namespace OtaCanProtocol {
 
 constexpr uint32_t CAN_ID = 0xABC;
+constexpr uint32_t RESPONSE_CAN_ID = 0xDEF;
 constexpr uint8_t FRAME_START = 0x01;
 constexpr uint8_t FRAME_DATA = 0x02;
 constexpr uint8_t FRAME_END = 0x03;
-constexpr uint8_t FRAME_UPGRADE_REQUEST = 0x10;
-constexpr uint8_t FRAME_STATUS_REQUEST = 0x11;
-constexpr uint8_t FRAME_METADATA = 0x12;
+constexpr uint8_t FRAME_APPLICATION_REQUEST = 0x10;
+constexpr uint8_t FRAME_PARAMETERS_REQUEST = 0x11;
+constexpr uint8_t FRAME_STATUS_REQUEST = 0x13;
 enum ImageType : uint8_t { APPLICATION = 1, PARAMETERS = 2 };
 constexpr uint8_t FRAME_ACK = 0x80;
 
@@ -77,27 +77,25 @@ enum Status : uint8_t {
     STATUS_SIZE_ERROR = 5,
     STATUS_FLASH_ERROR = 6,
     STATUS_COMPLETE = 7,
-    STATUS_ALREADY_CURRENT = 8,
+    STATUS_RESERVED = 8,
     STATUS_STOPPING = 9,
     STATUS_STOPPED = 10,
     STATUS_IMAGE_CHECKSUM = 12,
-    STATUS_BUSY = 13,
-    STATUS_NEED_SIZE = 15
+    STATUS_BUSY = 13
 };
 
 }
 
-inline bool valid_image_size(uint32_t type, uint32_t size) {
+inline bool image_fits_flash(uint32_t type, uint32_t size) {
     return type == OtaCanProtocol::APPLICATION
-        ? size >= OTA_MIN_APP_SIZE && size <= APPLICATION_SIZE
+        ? size > 0 && size <= APPLICATION_SIZE
         : type == OtaCanProtocol::PARAMETERS &&
           size > 0 && size <= APPLICATION_CONFIG_SIZE;
 }
 
-inline bool valid_app_vectors(uint32_t sp, uint32_t entry, uint32_t size) {
-    return sp > 0x20000000 && sp <= 0x20020000 && (sp & 7) == 0 &&
-           (entry & 1) && (entry & ~1U) >= APPLICATION_START &&
-           (entry & ~1U) < APPLICATION_START + size;
+inline bool valid_app_reset_entry(uint32_t entry) {
+    return (entry & 1) && (entry & ~1U) >= APPLICATION_START &&
+           (entry & ~1U) < APPLICATION_START + APPLICATION_SIZE;
 }
 
 #endif

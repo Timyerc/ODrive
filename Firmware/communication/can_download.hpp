@@ -1,5 +1,5 @@
-#ifndef FIRMWARE_CAN_BOOT_HPP
-#define FIRMWARE_CAN_BOOT_HPP
+#ifndef FIRMWARE_CAN_DOWNLOAD_HPP
+#define FIRMWARE_CAN_DOWNLOAD_HPP
 
 #include "communication/can_helpers.hpp"
 
