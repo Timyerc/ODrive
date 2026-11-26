@@ -20,33 +20,30 @@ CAN_REQUEST_ID = 0xABC
 CAN_RESPONSE_ID = 0xDEF
 CHUNK_SIZE = 1024
 MAX_FIRMWARE_SIZE = 320 * 1024
-FRAME_START = 0x01
-FRAME_DATA = 0x02
-FRAME_END = 0x03
+FRAME_DATA = 0x01
+FRAME_DATA_ACK = 0x02
+FRAME_CHUNK_CRC_REQUEST = 0x03
+FRAME_CHUNK_CRC_RESPONSE = 0x04
+FRAME_IMAGE_CRC_REQUEST = 0x05
+FRAME_IMAGE_CRC_RESPONSE = 0x06
+FRAME_VERSION_REQUEST = 0x07
+FRAME_VERSION_RESPONSE = 0x08
 FRAME_APPLICATION_REQUEST = 0x10
 FRAME_PARAMETERS_REQUEST = 0x11
-FRAME_STATUS_REQUEST = 0x13
-FRAME_ACK = 0x80
+FRAME_READY = 0x13
+READY_PENDING = 0
+READY_SUCCESS = 1
+READY_REJECTED = 2
+TRANSFER_SUCCESS = 1
 IMAGE_TYPES = {"app": 1, "parameters": 2}
 REQUEST_OPCODES = {"app": FRAME_APPLICATION_REQUEST,
                    "parameters": FRAME_PARAMETERS_REQUEST}
 
-STATUS_NAMES = {
-    0: "ready",
-    1: "accepted",
-    2: "checksum mismatch",
-    3: "invalid or missing data frame",
-    4: "unexpected packet sequence",
-    5: "invalid firmware size",
-    6: "Flash operation failed",
-    7: "transfer complete",
-    8: "reserved status",
-    9: "device is stopping its axes",
-    10: "device is stopped",
-    12: "full image checksum mismatch",
-    13: "device is busy",
+READY_STATUS_NAMES = {
+    READY_PENDING: "preparing",
+    READY_SUCCESS: "ready",
+    READY_REJECTED: "request rejected",
 }
-
 
 def make_message(can, payload):
     return can.Message(
@@ -62,39 +59,172 @@ def send_control(bus, can, payload, log):
         log("TX 0xABC EXT [{}] {}".format(len(payload), payload.hex(" ")))
 
 
-def wait_for_ack(bus, can, sequence, timeout, log=None):
+def wait_for_version_response(bus, timeout, log=None):
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("timed out waiting for firmware version response")
+        message = bus.recv(remaining)
+        if message is None or message.is_error_frame or message.is_remote_frame:
+            continue
+        if (message.arbitration_id != CAN_RESPONSE_ID or not message.is_extended_id or
+                not message.data or message.data[0] != FRAME_VERSION_RESPONSE):
+            continue
+        if len(message.data) != 5:
+            raise RuntimeError(
+                "invalid firmware version response: {}".format(message.data.hex(" "))
+            )
+        version = tuple(message.data[1:5])
+        if log:
+            log("RX VERSION 0xDEF EXT [5] {} | {}.{}.{}{}".format(
+                message.data.hex(" "), version[0], version[1], version[2],
+                "-dev" if version[3] else ""))
+        return version
+
+
+def query_firmware_version(interface, channel, bitrate, timeout=5.0,
+                           retries=5, can_module=None, log_callback=None):
+    if can_module is None:
+        try:
+            import can as can_module
+        except ImportError as error:
+            raise RuntimeError(
+                "缺少 python-can，请运行：python -m pip install python-can"
+            ) from error
+
+    with can_module.Bus(interface=interface, channel=channel, bitrate=bitrate) as bus:
+        for attempt in range(retries + 1):
+            send_control(bus, can_module, bytes([FRAME_VERSION_REQUEST]), log_callback)
+            try:
+                return wait_for_version_response(bus, timeout, log_callback)
+            except TimeoutError:
+                if attempt == retries:
+                    raise
+    raise RuntimeError("firmware version query retries exhausted")
+
+
+def wait_for_ready(bus, timeout, log=None):
     deadline = time.monotonic() + timeout
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             if log:
-                log("ACK timeout: seq={}".format(sequence))
-            raise TimeoutError("timed out waiting for device acknowledgement")
+                log("ready response timeout")
+            raise TimeoutError("timed out waiting for device ready response")
         message = bus.recv(remaining)
         if message is None or message.is_error_frame or message.is_remote_frame:
             continue
         if (message.arbitration_id != CAN_RESPONSE_ID or not message.is_extended_id or
-                len(message.data) != 8 or message.data[0] != FRAME_ACK):
+                len(message.data) != 8 or message.data[0] != FRAME_READY):
             continue
-        ack_sequence = struct.unpack_from("<H", message.data, 2)[0]
-        if ack_sequence == sequence:
-            status = message.data[1]
-            expected = struct.unpack_from("<H", message.data, 4)[0]
-            image_crc = struct.unpack_from("<I", message.data, 4)[0] \
-                if status in (7, 12) else None
-            if log:
-                details = " CRC32=0x{:08X}".format(image_crc) if image_crc is not None else ""
-                if image_crc is None:
-                    detail = "seq={} expected={}".format(sequence, expected)
-                else:
-                    detail = "seq={}{}".format(sequence, details)
-                log("RX 0xDEF EXT [8] {} | {} {}".format(
-                    message.data.hex(" "), STATUS_NAMES.get(status, status), detail))
-            return status, expected, image_crc
+        status = message.data[1]
+        chunk_count = struct.unpack_from("<H", message.data, 2)[0]
+        if log:
+            log("RX READY 0xDEF EXT [8] {} | {} chunks={}".format(
+                message.data.hex(" "),
+                READY_STATUS_NAMES.get(status, "status {}".format(status)),
+                chunk_count))
+        if status != READY_PENDING:
+            return status, chunk_count
+
+
+def request_ready(bus, can, request, timeout, log=None):
+    deadline = time.monotonic() + 120.0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("等待驱动器停机并准备 OTA 超时")
+        send_control(bus, can, request, log)
+        try:
+            response = wait_for_ready(bus, min(timeout, remaining), log)
+        except TimeoutError:
+            continue
+        status, chunk_count = response
+        if status == READY_SUCCESS:
+            return chunk_count
+        if status == READY_REJECTED:
+            raise RuntimeError("驱动器拒绝 OTA 请求")
+        raise RuntimeError("驱动器返回未知就绪状态：{}".format(status))
+
+
+def wait_for_frame_ack(bus, frame_index, timeout, log=None):
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                "等待 CAN 帧 {} 的驱动器应答超时".format(frame_index)
+            )
+        message = bus.recv(remaining)
+        if message is None or message.is_error_frame or message.is_remote_frame:
+            continue
+        if (message.arbitration_id != CAN_RESPONSE_ID or not message.is_extended_id or
+                len(message.data) != 7 or message.data[0] != FRAME_DATA_ACK or
+                message.data[1] != frame_index):
+            continue
+        if log:
+            log("RX ACK 0xDEF EXT [7] {} | frame={} received".format(
+                message.data.hex(" "), frame_index))
+        return
+
+
+def send_data_frame(bus, can, frame_index, payload, args, log_callback=None):
+    message = make_message(can, payload)
+    for attempt in range(args.retries + 1):
+        bus.send(message)
+        if log_callback and attempt:
+            log_callback("重发帧内数据 frame={} attempt={}".format(
+                frame_index, attempt + 1))
+        try:
+            wait_for_frame_ack(bus, frame_index, args.timeout, log_callback)
+        except TimeoutError:
+            if attempt == args.retries:
+                raise
+            continue
+        return
+    raise RuntimeError("数据帧 {} 重试次数耗尽".format(frame_index))
+
+
+def wait_for_crc_response(bus, response_opcode, timeout, log=None):
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("等待 CRC32 应答超时")
+        message = bus.recv(remaining)
+        if message is None or message.is_error_frame or message.is_remote_frame:
+            continue
+        if (message.arbitration_id != CAN_RESPONSE_ID or not message.is_extended_id or
+                not message.data or message.data[0] != response_opcode):
+            continue
+        if len(message.data) != 5:
+            raise RuntimeError(
+                "驱动器 CRC32 查询失败：{}".format(message.data.hex(" "))
+            )
+        checksum = struct.unpack_from("<I", message.data, 1)[0]
+        if log:
+            log("RX CRC 0xDEF EXT [5] {} | CRC32=0x{:08X}".format(
+                message.data.hex(" "), checksum))
+        return checksum
+
+
+def send_crc_request(bus, can, opcode, response_opcode, checksum, args,
+                     log_callback=None):
+    payload = bytes([opcode]) + struct.pack("<I", checksum)
+    for attempt in range(args.retries + 1):
+        send_control(bus, can, payload, log_callback)
+        try:
+            return wait_for_crc_response(
+                bus, response_opcode, args.timeout, log_callback)
+        except TimeoutError:
+            if attempt == args.retries:
+                raise
+    raise RuntimeError("CRC32 查询重试次数耗尽")
 
 
 def send_chunk(bus, can, sequence, image_size, chunk, args, log_callback=None,
-               expected_image_crc=None, interference_queue=None):
+               interference_queue=None):
     checksum = zlib.crc32(chunk) & 0xFFFFFFFF
     valid_chunk_size = min(CHUNK_SIZE, max(0, image_size - sequence * CHUNK_SIZE))
 
@@ -108,30 +238,9 @@ def send_chunk(bus, can, sequence, image_size, chunk, args, log_callback=None,
             return False
 
     for attempt in range(args.retries + 1):
-        start = bytes([FRAME_START, 0]) + struct.pack(
-            "<HI", sequence, image_size
-        )
         if log_callback:
             log_callback("chunk={} CRC32=0x{:08X} attempt={}/{}".format(
                 sequence, checksum, attempt + 1, args.retries + 1))
-        send_control(bus, can, start, log_callback)
-
-        try:
-            status, expected, _ = wait_for_ack(
-                bus, can, sequence, args.timeout, log_callback)
-        except TimeoutError:
-            if attempt == args.retries:
-                raise
-            continue
-        if status != 0:
-            if status in (2, 3) and attempt < args.retries:
-                continue
-            raise RuntimeError(
-                "device rejected chunk {}: {} (expected sequence {})".format(
-                    sequence, STATUS_NAMES.get(status, "status {}".format(status)),
-                    expected
-                )
-            )
 
         for frame_index, offset in enumerate(range(0, CHUNK_SIZE, 6)):
             payload = chunk[offset:offset + 6].ljust(6, b"\xFF")
@@ -146,74 +255,40 @@ def send_chunk(bus, can, sequence, image_size, chunk, args, log_callback=None,
                             sequence, frame_index
                         )
                     )
-            bus.send(make_message(can, bytes([FRAME_DATA, frame_index]) + frame_data))
+            send_data_frame(
+                bus, can, frame_index,
+                bytes([FRAME_DATA, frame_index]) + frame_data,
+                args, log_callback)
             if args.frame_delay:
                 time.sleep(args.frame_delay)
 
-        end_checksum = checksum
-        if consume_interference():
-            end_checksum ^= 0x00000001
-            if log_callback:
-                log_callback(
-                    "SIMULATED INTERFERENCE: corrupted chunk={} CRC field to trigger retry".format(
-                        sequence
-                    )
-                )
-        end = bytes([FRAME_END]) + struct.pack("<HI", sequence, end_checksum)
-        if log_callback:
-            log_callback("TX DATA 0x02: index=0..{}, 6 bytes/frame".format(frame_index))
-        send_control(bus, can, end, log_callback)
-
-        try:
-            status, expected, image_crc = wait_for_ack(
-                bus, can, sequence, args.timeout, log_callback)
-        except TimeoutError:
-            if attempt == args.retries:
-                raise
-            continue
-
-        is_final_chunk = (sequence + 1) * CHUNK_SIZE >= image_size
-        if status == (7 if is_final_chunk else 1):
+        actual_crc = send_crc_request(
+            bus, can, FRAME_CHUNK_CRC_REQUEST, FRAME_CHUNK_CRC_RESPONSE, checksum,
+            args, log_callback)
+        if actual_crc == checksum:
             if attempt and log_callback:
                 log_callback(
                     "Chunk {} accepted after {} retry attempt(s)".format(
                         sequence, attempt
                     )
                 )
-            return status, image_crc
-        if status in (2, 3) and attempt < args.retries:
+            return TRANSFER_SUCCESS
+        if attempt < args.retries:
             message = "Chunk {} rejected ({}); retrying".format(
-                sequence, STATUS_NAMES[status])
+                sequence,
+                "CRC32 mismatch: device 0x{:08X}, host 0x{:08X}".format(
+                    actual_crc, checksum))
             if log_callback:
                 log_callback(message)
             else:
                 print(message, file=sys.stderr)
             continue
-        if status == 12 and image_crc is not None:
-            raise RuntimeError(
-                "设备整包 CRC32 不匹配：发送 0x{:08X}，设备读回 0x{:08X}".format(
-                    expected_image_crc if expected_image_crc is not None else 0,
-                    image_crc
-                )
-            )
         raise RuntimeError(
-            "device rejected chunk {}: {} (expected sequence {})".format(
-                sequence, STATUS_NAMES.get(status, "status {}".format(status)),
-                expected
-            )
+            "分片 {} CRC32 不匹配：本地 0x{:08X}，设备 0x{:08X}".format(
+                sequence, checksum, actual_crc)
         )
 
     raise RuntimeError("chunk {} failed after retries".format(sequence))
-
-
-def send_and_wait(bus, can, payload, sequence, timeout, retries, log=None):
-    for attempt in range(retries + 1):
-        send_control(bus, can, payload, log)
-        try:
-            return wait_for_ack(bus, can, sequence, timeout, log)
-        except TimeoutError:
-            if attempt == retries:
-                raise
 
 
 def read_image(firmware_path, image_type):
@@ -280,44 +355,29 @@ def transfer_firmware(firmware_path, interface, channel, bitrate,
         frame_delay=frame_delay,
     )
     with can_module.Bus(interface=interface, channel=channel, bitrate=bitrate) as bus:
-        request = bytes([REQUEST_OPCODES[image_type]]) + image_size.to_bytes(3, "little") + \
-            struct.pack("<I", image_crc)
-        status, _, _ = send_and_wait(
-            bus, can_module, request, 0, timeout, retries, log_callback
+        request = bytes([REQUEST_OPCODES[image_type]]) + image_size.to_bytes(3, "little")
+        ready_chunk_count = request_ready(
+            bus, can_module, request, timeout, log_callback
         )
-        if status not in (9, 10):
+        if ready_chunk_count != chunk_count:
             raise RuntimeError(
-                "设备拒绝升级请求：{}".format(
-                    STATUS_NAMES.get(status, "status {}".format(status))
+                "驱动器就绪片数不匹配：本地 {}，设备 {}".format(
+                    chunk_count, ready_chunk_count
                 )
             )
-
-        stop_deadline = time.monotonic() + 120.0
-        while status != 10:
-            if time.monotonic() >= stop_deadline:
-                raise TimeoutError("等待设备停机超时")
-            if status == 9:
-                time.sleep(0.1)
-            status, _, _ = send_and_wait(
-                bus, can_module, bytes([FRAME_STATUS_REQUEST]), 0, timeout, retries, log_callback
-            )
-            if status not in (9, 10):
-                raise RuntimeError(
-                    "设备停止状态异常：{}".format(
-                        STATUS_NAMES.get(status, "status {}".format(status))
-                    )
-                )
-
         for sequence in range(chunk_count):
             offset = sequence * CHUNK_SIZE
             chunk = firmware[offset:offset + CHUNK_SIZE].ljust(CHUNK_SIZE, b"\xFF")
-            status, device_crc = send_chunk(
+            status = send_chunk(
                 bus, can_module, sequence, len(firmware), chunk, transfer_args,
-                log_callback=log_callback, expected_image_crc=image_crc,
+                log_callback=log_callback,
                 interference_queue=interference_queue,
             )
             if progress_callback:
                 progress_callback(sequence + 1, chunk_count, status)
+        device_crc = send_crc_request(
+            bus, can_module, FRAME_IMAGE_CRC_REQUEST,
+            FRAME_IMAGE_CRC_RESPONSE, image_crc, transfer_args, log_callback)
     if device_crc != image_crc:
         raise RuntimeError(
             "设备整包 CRC32 不匹配：发送 0x{:08X}，设备读回 0x{:08X}".format(
@@ -372,6 +432,8 @@ def main(argv=None):
                         help="target image: app (default) or parameters")
     parser.add_argument("--auto", action="store_true",
                         help="download parameters first, then application")
+    parser.add_argument("--read-version", action="store_true",
+                        help="read the connected drive's firmware version")
     parser.add_argument("--parameters-image", help="parameter Config .bin for --auto")
     parser.add_argument("--application-image", help="application Firmware .bin for --auto")
     for option in ("size", "crc32", "chunks"):
@@ -382,7 +444,7 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=5.0,
                         help="acknowledgement timeout in seconds (default: 5)")
     parser.add_argument("--retries", type=int, default=5,
-                        help="maximum retries per 1 KiB chunk (default: 5)")
+                        help="maximum retries per CAN frame or 1 KiB chunk (default: 5)")
     parser.add_argument("--frame-delay", type=float, default=0.001,
                         help="delay between data frames in seconds (default: 0.001)")
     args = parser.parse_args(argv)
@@ -391,7 +453,19 @@ def main(argv=None):
         parser.error("timeout must be positive and retries/frame-delay non-negative")
 
     try:
-        if args.auto:
+        if args.read_version:
+            if (args.firmware or args.auto or args.parameters_image or
+                    args.application_image or args.size is not None or
+                    args.crc32 is not None or args.chunks is not None):
+                parser.error("--read-version cannot be combined with firmware download options")
+            version = query_firmware_version(
+                args.interface, args.channel, args.bitrate,
+                timeout=args.timeout, retries=args.retries, log_callback=print)
+            print("Firmware version {}.{}.{}{}".format(
+                version[0], version[1], version[2],
+                "-dev" if version[3] else ""))
+            return 0
+        elif args.auto:
             if args.firmware or not args.parameters_image or not args.application_image:
                 parser.error("--auto requires --parameters-image and --application-image, without firmware positional")
             results = transfer_images_in_order(
@@ -403,7 +477,8 @@ def main(argv=None):
                 frame_delay=args.frame_delay,
                 progress_callback=lambda kind, current, total, status: print(
                     "{} chunk {}/{} {}".format(
-                        kind, current, total, "complete" if status == 7 else "saved"
+                            kind, current, total,
+                            "complete" if status == TRANSFER_SUCCESS else "saved"
                     ), flush=True),
             )
         else:
@@ -419,7 +494,8 @@ def main(argv=None):
                 frame_delay=args.frame_delay,
                 progress_callback=lambda current, total, status: print(
                     "Chunk {}/{} {}".format(
-                        current, total, "complete" if status == 7 else "saved"
+                        current, total,
+                        "complete" if status == TRANSFER_SUCCESS else "saved"
                     ),
                     flush=True,
                 ),
@@ -614,8 +690,9 @@ def launch_gui():
         "使用说明\n"
         "1. 分别选择应用和参数 .bin：应用不超过 320 KiB，参数不超过 128 KiB；文件名需分别包含 Firmware 和 Config。\n"
         "2. 选择 CAN 接口并扫描端口，也可以手动输入通道名；选择与设备一致的波特率。\n"
-        "3. 可分别下载，或使用自动下载按“参数→应用”顺序执行。参数写入后不重启；应用接收、CRC 校验成功后复位进入 bootloader。CAN 请求 ID 为 0xABC，响应 ID 为 0xDEF。\n"
-        "4. 下载期间可重复按“模拟数据干扰”，每次破坏一个分片以验证 CRC 错误应答和整片重传；上一次重传成功后按钮会重新启用。\n\n"
+        "3. 请求后由驱动器自行停机并通过 0x13 回复就绪状态。每个 0x01 数据帧都需收到对应 0x02 应答；每片通过 0x03 查询、0x04 回复分片 CRC，整包通过 0x05 查询、0x06 回复 CRC；CAN 请求 ID 为 0xABC，响应 ID 为 0xDEF。\n"
+        "4. 可分别下载，或使用自动下载按“参数→应用”顺序执行。参数写入后不重启；应用 CRC 校验成功后复位进入 bootloader。\n"
+        "5. 下载期间可重复按“模拟数据干扰”，每次破坏一个数据帧以验证分片 CRC 不匹配和整片重传；上一次重传成功后按钮会重新启用。\n\n"
         "Python 支持包与驱动\n"
         "• 必装：python -m pip install python-can\n"
         "• PCAN-USB：安装 PEAK PCAN 驱动/PCAN-Basic；接口选 pcan，端口通常为 PCAN_USBBUS1。\n"

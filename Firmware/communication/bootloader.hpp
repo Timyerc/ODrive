@@ -59,29 +59,23 @@ namespace OtaCanProtocol {
 
 constexpr uint32_t CAN_ID = 0xABC;
 constexpr uint32_t RESPONSE_CAN_ID = 0xDEF;
-constexpr uint8_t FRAME_START = 0x01;
-constexpr uint8_t FRAME_DATA = 0x02;
-constexpr uint8_t FRAME_END = 0x03;
+constexpr uint8_t FRAME_DATA = 0x01;
+constexpr uint8_t FRAME_DATA_ACK = 0x02;
+constexpr uint8_t FRAME_CHUNK_CRC_REQUEST = 0x03;
+constexpr uint8_t FRAME_CHUNK_CRC_RESPONSE = 0x04;
+constexpr uint8_t FRAME_IMAGE_CRC_REQUEST = 0x05;
+constexpr uint8_t FRAME_IMAGE_CRC_RESPONSE = 0x06;
+constexpr uint8_t FRAME_VERSION_REQUEST = 0x07;
+constexpr uint8_t FRAME_VERSION_RESPONSE = 0x08;
 constexpr uint8_t FRAME_APPLICATION_REQUEST = 0x10;
 constexpr uint8_t FRAME_PARAMETERS_REQUEST = 0x11;
-constexpr uint8_t FRAME_STATUS_REQUEST = 0x13;
+constexpr uint8_t FRAME_READY = 0x13;
 enum ImageType : uint8_t { APPLICATION = 1, PARAMETERS = 2 };
-constexpr uint8_t FRAME_ACK = 0x80;
 
-enum Status : uint8_t {
-    STATUS_READY = 0,
-    STATUS_ACCEPTED = 1,
-    STATUS_RETRY_CHECKSUM = 2,
-    STATUS_RETRY_DATA = 3,
-    STATUS_SEQUENCE_ERROR = 4,
-    STATUS_SIZE_ERROR = 5,
-    STATUS_FLASH_ERROR = 6,
-    STATUS_COMPLETE = 7,
-    STATUS_RESERVED = 8,
-    STATUS_STOPPING = 9,
-    STATUS_STOPPED = 10,
-    STATUS_IMAGE_CHECKSUM = 12,
-    STATUS_BUSY = 13
+enum ReadyStatus : uint8_t {
+    READY_PENDING = 0,
+    READY_SUCCESS = 1,
+    READY_REJECTED = 2
 };
 
 }

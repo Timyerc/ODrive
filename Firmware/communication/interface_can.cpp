@@ -63,6 +63,9 @@ void ODriveCAN::can_server_thread() {
                         break;
                 }
             }
+            can_Message_t ota_response;
+            if (FirmwareOTA::process(ota_response) && ota_response.len > 0)
+                write(ota_response);
             HAL_CAN_ActivateNotification(handle_, CAN_IT_RX_FIFO0_MSG_PENDING);
         } else {
             if (status == HAL_CAN_ERROR_TIMEOUT) {
