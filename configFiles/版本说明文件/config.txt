@@ -9,19 +9,20 @@
 # 设置为 True 继续执行，False 则提前退出脚本
 should_continue = True
 
-# 2.2 是否在执行前清理输出目录，删除除主固件"ODriveFirmware.hex"外的所有HEX文件
+# 2.2 是否在执行前清理输出目录，保留所有输入HEX文件
 delete_hex = True
 
 # 2.2 自定义地址阈值（十六进制），生成的固件超出的部分将会被丢弃
-address_threshold = 0x80100000
+address_threshold = 0x080FFFFF
 
-# 2.3 配置应用程序固件路径
+# 2.3 配置bootloader和应用程序固件路径（相对于 tools/odrive）
+bootloader_file = ../../Firmware/build/bootloader/ODriveBootloader.hex
 firmware_file = ../../Firmware/build/ODriveFirmware.hex
 
 # 2.4 应用程序固件的参数部分路径列表
-# 每个参数文件将与主固件拼接，生成一个新固件
+# 每个参数文件将与bootloader和主固件拼接，生成一个新固件
 # 参数文件名将被用作新固件的命名
-datafile_paths = ../../configFiles/光伏驱动轮/Run.hex, ../../configFiles/光伏滚刷/Brush.hex, ../../configFiles/光伏驱动轮短款/LiteRun.hex
+datafile_paths = ../../configFiles/光伏驱动轮/RunConfig.hex, ../../configFiles/光伏滚刷/BrushConfig.hex, ../../configFiles/光伏驱动轮短款/LiteRunConfig.hex
 
 # 2.5 NVM参数提取脚本使用的整片Flash HEX路径列表
 nvm_extract_paths = ../../configFiles/光伏驱动轮/RunODrive-fw-v0.5.8.hex, ../../configFiles/光伏滚刷/BrushODrive-fw-v0.5.8.hex, ../../configFiles/光伏驱动轮短款/LiteRunODrive-fw-v0.5.8.hex
@@ -35,7 +36,7 @@ nvm_extract_paths = ../../configFiles/光伏驱动轮/RunODrive-fw-v0.5.8.hex, .
 # ================================================================================================================
 # 脚本功能及特点说明：
 # 功能：
-# 1. 将固件和不同的参数文件拼接产生各自的固件
+# 1. 将bootloader、应用固件和不同的参数文件拼接产生各自的固件
 # 2. 自动提取tag名和参数文件名，生成对应的固件版本名
 
 # 特点：
@@ -43,6 +44,6 @@ nvm_extract_paths = ../../configFiles/光伏驱动轮/RunODrive-fw-v0.5.8.hex, .
 # 2. 地址过滤 - 自动移除 address_threshold 地址之后的所有数据,防止固件过大，无法烧录
 # 3. 新固件名灵活生成 - 输出的文件命名为[参数文件名]-[tag名].hex，
 # 4. 自动删除和覆盖文件 - 直接替换已存在的文件,可选择是否删除主固件同级目录下的其他固件
-# 5. 如果使用bootloader则不支持此方式合并。
+# 5. 使用bootloader的启动地址记录，忽略应用固件的启动地址记录。
 
 # ================================================================================================================

@@ -2,7 +2,7 @@
 """
 ODrive固件拼接脚本
 功能：
-1. 将主固件文件与多个参数文件分别合并,生成对应数量的新固件
+1. 将bootloader、主固件和多个参数文件分别合并,生成对应数量的新固件
 2. 通过配置文件控制行为,配置文件示例(config.txt)
 3. 从git tag中提取用户实际创建的tag名称
 4. 生成新的HEX文件,命名为[参数文件名][tag名].hex
@@ -15,7 +15,10 @@ import os
 import sys
 import subprocess
 import glob
+import tempfile
 from pathlib import Path
+
+from extract_nvm_config import ihex_record
 
 SHOW_LOGS = False
 
@@ -35,9 +38,8 @@ class Logger:
     
     def warning(self, message):
         """警告信息"""
-        if SHOW_LOGS:
-            if self.show_warning:
-                print(f"[WARNING] {message}")
+        if self.show_warning:
+            print(f"[WARNING] {message}")
     
     def error(self, message):
         """错误信息"""
@@ -126,6 +128,7 @@ class ConfigParser:
             'show_error': True,
             'delete_hex': False,
             'address_threshold': 0x80FFFFF,
+            'bootloader_file': "",
             'firmware_file': "",
             'datafile_paths': [],
             'released_mode': ""
@@ -174,102 +177,14 @@ class ConfigParser:
                 
                 elif key == 'firmware_file':
                     config['firmware_file'] = value.strip('"\'')
+
+                elif key == 'bootloader_file':
+                    config['bootloader_file'] = value.strip('"\'')
                 
                 elif key == 'datafile_paths':
                     config['datafile_paths'] = ConfigParser.parse_file_paths(value)
         
         return config
-
-def parse_hex_line(line):
-    """
-    解析HEX文件的一行记录
-    返回解析后的字典或None
-    """
-    line = line.strip()
-    if not line.startswith(':'):
-        return None
-    
-    try:
-        byte_count = int(line[1:3], 16)
-        address = int(line[3:7], 16)
-        record_type = int(line[7:9], 16)
-        data = line[9:9+byte_count*2]
-        checksum = int(line[9+byte_count*2:], 16)
-        
-        return {
-            'address': address,
-            'record_type': record_type,
-            'byte_count': byte_count,
-            'data': data,
-            'checksum': checksum,
-            'full_line': line
-        }
-    except:
-        return None
-
-def should_keep_record(record, extended_address, address_threshold):
-    """
-    判断是否应该保留该记录（地址是否在ADDRESS_THRESHOLD之前）
-    """
-    if record is None:
-        return False
-    
-    # 如果是扩展线性地址记录，更新当前的高位地址
-    if record['record_type'] == 4:
-        return True
-    
-    # 如果是结束记录，保留
-    if record['record_type'] == 1:
-        return True
-    
-    # 计算完整地址 = 扩展地址 * 0x10000 + 偏移地址
-    full_address = (extended_address << 16) + record['address']
-    
-    # 只保留地址小于等于ADDRESS_THRESHOLD的记录
-    return full_address <= address_threshold
-
-def filter_hex_file(input_file, address_threshold, logger):
-    """
-    过滤HEX文件，移除指定地址之后的所有数据
-    返回过滤后的行列表
-    """
-    filtered_lines = []
-    current_extended_address = 0x0000
-    removed_count = 0
-    
-    try:
-        with open(input_file, 'r') as f:
-            lines = f.readlines()
-        
-        for line in lines:
-            line = line.strip()
-            record = parse_hex_line(line)
-            
-            if record:
-                # 更新扩展地址
-                if record['record_type'] == 4:
-                    current_extended_address = int(record['data'][0:4], 16)
-                
-                # 判断是否保留该记录
-                if should_keep_record(record, current_extended_address, address_threshold):
-                    filtered_lines.append(line)
-                else:
-                    removed_count += 1
-                    if logger.show_debug and record['record_type'] == 0:  # 数据记录
-                        full_address = (current_extended_address << 16) + record['address']
-                        logger.debug(f"移除地址: 0x{full_address:08X} > 0x{address_threshold:08X}")
-            else:
-                # 不是有效的HEX记录，保留原样
-                filtered_lines.append(line)
-        
-        if removed_count > 0:
-            logger.info(f"过滤完成: 移除 {removed_count} 条超过阈值的记录")
-        
-        return filtered_lines
-        
-    except Exception as e:
-        logger.error(f"过滤HEX文件时出错: {e}")
-        return None
 
 def get_git_tag_name(logger):
     """
@@ -338,46 +253,108 @@ def get_git_tag_name(logger):
         logger.error(f"获取git tag名称时出错: {e}")
         return "v0.0.0", False
 
-def merge_hex_files(firmware_file, motorpara_file, output_file, address_threshold, logger):
-    """
-    合并两个HEX文件，并移除指定地址之后的所有数据
-    """
+def read_hex_file(path):
+    """读取并验证 Intel HEX，返回绝对地址数据和可选的启动地址记录。"""
+    data = {}
+    base = 0
+    start_record = None
+    eof = False
+    with open(path, 'r', encoding='ascii') as source:
+        for line_number, line in enumerate(source, 1):
+            line = line.strip()
+            try:
+                if eof or not line.startswith(':'):
+                    raise ValueError("结束记录后有内容或缺少冒号")
+                raw = bytes.fromhex(line[1:])
+                if len(raw) < 5 or len(raw) != raw[0] + 5 or sum(raw) & 0xff:
+                    raise ValueError("记录长度或校验和错误")
+                count, address, record_type = raw[0], int.from_bytes(raw[1:3], 'big'), raw[3]
+                payload = raw[4:-1]
+                if record_type == 0:
+                    if address + count > 0x10000 or base + address + count > 0x100000000:
+                        raise ValueError("数据记录超出地址范围")
+                    for offset, value in enumerate(payload):
+                        absolute = base + address + offset
+                        if absolute in data:
+                            raise ValueError(f"地址 0x{absolute:08X} 重复")
+                        data[absolute] = value
+                elif record_type == 1 and count == 0 and address == 0:
+                    eof = True
+                elif record_type in (2, 4) and count == 2 and address == 0:
+                    base = int.from_bytes(payload, 'big') << (4 if record_type == 2 else 16)
+                elif record_type in (3, 5) and count == 4 and address == 0:
+                    if start_record is not None:
+                        raise ValueError("多个启动地址记录")
+                    start_record = (record_type, payload)
+                else:
+                    raise ValueError(f"无效的记录类型或长度: {record_type}")
+            except ValueError as exc:
+                raise ValueError(f"{path}:{line_number}: {exc}") from exc
+    if not eof:
+        raise ValueError(f"{path}: 缺少结束记录")
+    if not data:
+        raise ValueError(f"{path}: 没有数据记录")
+    return data, start_record
+
+
+def merge_hex_files(bootloader_file, firmware_file, motorpara_file, output_file, address_threshold, logger):
+    """按绝对地址合并三个HEX文件，保留bootloader的启动地址。"""
     try:
-        logger.debug(f"开始过滤固件文件: {firmware_file}")
-        
-        # 先过滤固件文件，移除指定地址之后的数据
-        firmware_lines = filter_hex_file(firmware_file, address_threshold, logger)
-        if firmware_lines is None:
-            logger.error(f"无法过滤固件文件 {firmware_file}")
-            return False
-        
-        logger.debug(f"开始过滤参数文件: {motorpara_file}")
-        
-        # 过滤电机参数文件
-        motorpara_lines = filter_hex_file(motorpara_file, address_threshold, logger)
-        if motorpara_lines is None:
-            logger.error(f"无法过滤参数文件 {motorpara_file}")
-            return False
-        
-        # 创建输出文件
-        with open(output_file, 'w') as f:
-            # 写入过滤后的固件内容（去掉结束记录）
-            for line in firmware_lines:
-                if not ':00000001FF' in line:
-                    f.write(line + '\n')
-            
-            # 写入过滤后的电机参数内容
-            for line in motorpara_lines:
-                f.write(line + '\n')
-        
-        logger.debug(f"文件合并完成: {output_file}")
+        merged = {}
+        start_record = None
+        for index, path in enumerate((bootloader_file, firmware_file, motorpara_file)):
+            data, entry = read_hex_file(path)
+            if index == 0:
+                start_record = entry
+            removed = sum(1 for address in data if address > address_threshold)
+            if removed:
+                logger.warning(f"{path}: 过滤了 {removed} 个超过地址阈值的字节")
+            if removed == len(data):
+                raise ValueError(f"{path}: 地址过滤后没有数据")
+            for address, value in data.items():
+                if address > address_threshold:
+                    continue
+                if address in merged:
+                    raise ValueError(f"{path}: 地址 0x{address:08X} 与其他输入文件重叠")
+                merged[address] = value
+
+        if not merged:
+            raise ValueError("地址过滤后没有数据")
+
+        lines = []
+        addresses = sorted(merged)
+        position = 0
+        upper = None
+        while position < len(addresses):
+            address = addresses[position]
+            if address >> 16 != upper:
+                upper = address >> 16
+                lines.append(ihex_record(0, 4, upper.to_bytes(2, 'big')))
+            chunk = bytearray()
+            while (position < len(addresses) and len(chunk) < 16
+                   and addresses[position] == address + len(chunk)
+                   and addresses[position] >> 16 == upper):
+                chunk.append(merged[addresses[position]])
+                position += 1
+            lines.append(ihex_record(address & 0xffff, 0, chunk))
+        if start_record:
+            lines.append(ihex_record(0, *start_record))
+        lines.append(ihex_record(0, 1))
+
+        output_dir = os.path.dirname(os.path.abspath(output_file))
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile('w', encoding='ascii', newline='\n',
+                                             dir=output_dir, delete=False) as output:
+                temp_path = output.name
+                output.write('\n'.join(lines) + '\n')
+            os.replace(temp_path, output_file)
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
         return True
-        
-    except FileNotFoundError as e:
-        logger.error(f"找不到输入文件: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"合并HEX文件时出错: {e}")
+    except (OSError, UnicodeError, ValueError) as exc:
+        logger.error(f"合并HEX文件时出错: {exc}")
         return False
 
 def verify_hex_file(hex_file, address_threshold, logger):
@@ -385,51 +362,14 @@ def verify_hex_file(hex_file, address_threshold, logger):
     验证HEX文件，确保没有超过指定地址之后的数据
     """
     try:
-        with open(hex_file, 'r') as f:
-            lines = f.readlines()
-        
-        current_extended_address = 0x0000
-        max_address = 0
-        problematic_records = []
-        
-        logger.debug(f"开始验证HEX文件: {hex_file}")
-        
-        for line in lines:
-            line = line.strip()
-            record = parse_hex_line(line)
-            
-            if record is None:
-                continue
-            
-            # 更新扩展地址
-            if record['record_type'] == 4:
-                current_extended_address = int(record['data'][0:4], 16)
-            
-            # 计算完整地址
-            if record['record_type'] == 0:  # 数据记录
-                full_address = (current_extended_address << 16) + record['address']
-                
-                # 更新最大地址
-                if full_address > max_address:
-                    max_address = full_address
-                
-                # 检查地址是否超过阈值
-                if full_address > address_threshold:
-                    problematic_records.append({
-                        'address': full_address,
-                        'line': line
-                    })
-        
-        if problematic_records:
-            logger.error(f"发现 {len(problematic_records)} 条超过阈值的记录:")
-            for record in problematic_records[:5]:
-                logger.error(f"  地址: 0x{record['address']:08X}")
+        data, _ = read_hex_file(hex_file)
+        max_address = max(data)
+        if max_address > address_threshold:
+            logger.error(f"发现超过阈值的地址: 0x{max_address:08X}")
             return False
-        
         logger.debug(f"验证通过: 最大地址 0x{max_address:08X} <= 阈值 0x{address_threshold:08X}")
         return True
-        
-    except Exception as e:
+    except (OSError, UnicodeError, ValueError) as e:
         logger.error(f"验证HEX文件时出错: {e}")
         return False
 
@@ -482,9 +422,9 @@ def check_hex_file(file_path, file_type="文件", logger=None):
             print(f"[ERROR] 无法读取{file_type}: {file_path}, 错误: {e}")
         return False
 
-def clean_output_directory(output_dir, firmware_filename, logger):
+def clean_output_directory(output_dir, input_files, logger):
     """
-    清理输出目录，删除除主固件外的所有HEX文件
+    清理输出目录，保留所有输入HEX文件
     """
     try:
         if not os.path.exists(output_dir):
@@ -498,8 +438,8 @@ def clean_output_directory(output_dir, firmware_filename, logger):
         for hex_file in hex_files:
             filename = os.path.basename(hex_file)
             
-            # 跳过主固件文件
-            if filename == firmware_filename:
+            # 跳过输入文件
+            if os.path.normcase(os.path.abspath(hex_file)) in input_files:
                 continue
             
             try:
@@ -541,7 +481,8 @@ def main():
     # print_banner()
     
     # 配置文件路径
-    config_file = "../../configFiles/版本说明文件/config.txt"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_file = os.path.join(script_dir, "../../configFiles/版本说明文件/config.txt")
     
     # 首先读取配置以初始化日志器
     initial_config = ConfigParser.parse_config(config_file, Logger())
@@ -554,6 +495,12 @@ def main():
     )
     logger.info("开始解析配置文件...")
     config = ConfigParser.parse_config(config_file, logger)
+    for key in ('bootloader_file', 'firmware_file'):
+        if config[key]:
+            config[key] = os.path.abspath(os.path.join(script_dir, config[key]))
+    config['datafile_paths'] = [
+        os.path.abspath(os.path.join(script_dir, path)) for path in config['datafile_paths']
+    ]
     
     # 显示配置信息
     logger.info("【配置信息】")
@@ -575,6 +522,14 @@ def main():
         logger.info("根据配置文件设置，脚本将提前退出。")
         return 0
     
+    if not config['bootloader_file']:
+        logger.error("bootloader路径未指定")
+        return 1
+    if not check_file_exists(config['bootloader_file'], "bootloader文件", logger):
+        return 1
+    if not check_hex_file(config['bootloader_file'], "bootloader文件", logger):
+        return 1
+
     # 验证主固件文件
     if not config['firmware_file']:
         logger.error("主固件路径未指定")
@@ -592,8 +547,10 @@ def main():
     # 清理输出目录（如果需要）
     if config['delete_hex']:
         logger.info("\n【清理输出目录】")
-        output_dir = "../../Firmware/build/"
-        deleted_count = clean_output_directory(output_dir, firmware_filename, logger)
+        output_dir = os.path.abspath(os.path.join(script_dir, "../../Firmware/build/"))
+        input_files = {os.path.normcase(os.path.abspath(path)) for path in
+                       [config['bootloader_file'], config['firmware_file']] + config['datafile_paths']}
+        deleted_count = clean_output_directory(output_dir, input_files, logger)
         if deleted_count < 0:
             logger.error("清理输出目录失败")
             return 1
@@ -634,21 +591,20 @@ def main():
         logger.info(f"输出文件名: {output_filename}")
         
         # 创建输出目录
-        output_dir = "../../Firmware/build/"
+        output_dir = os.path.abspath(os.path.join(script_dir, "../../Firmware/build/"))
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, output_filename)
         
-        # 检查并自动覆盖已存在的文件
-        if os.path.exists(output_path):
-            logger.warning(f"覆盖已存在的文件: {output_filename}")
-            try:
-                os.remove(output_path)
-            except Exception as e:
-                logger.error(f"无法删除旧文件: {e}")
+        input_files = [config['bootloader_file'], config['firmware_file']] + config['datafile_paths']
+        if os.path.normcase(os.path.abspath(output_path)) in {
+                os.path.normcase(os.path.abspath(path)) for path in input_files}:
+            logger.error(f"输出文件不能覆盖输入文件: {output_path}")
+            continue
         
         # 合并文件
         logger.info("开始合并文件...")
-        if merge_hex_files(config['firmware_file'], datafile_path, output_path, config['address_threshold'], logger):
+        if merge_hex_files(config['bootloader_file'], config['firmware_file'], datafile_path,
+                           output_path, config['address_threshold'], logger):
             # 验证输出文件
             logger.info("验证输出文件...")
             if verify_hex_file(output_path, config['address_threshold'], logger):
@@ -680,7 +636,7 @@ def main():
     logger.info(f"成功合并: {successful_merges}/{total_files} 个文件")
     
     if successful_merges > 0:
-        output_dir = "../../Firmware/build/"
+        output_dir = os.path.abspath(os.path.join(script_dir, "../../Firmware/build/"))
         logger.info(f"\n生成的文件保存在: {os.path.abspath(output_dir)}")
         
         # 显示生成的输出文件列表
@@ -711,7 +667,7 @@ def main():
     
     logger.info(f"{'═' * 60}")
     
-    return 0 if successful_merges > 0 else 1
+    return 0 if total_files > 0 and successful_merges == total_files else 1
 
 if __name__ == "__main__":
     sys.exit(main())
