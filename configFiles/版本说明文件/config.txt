@@ -21,7 +21,10 @@ firmware_file = ../../Firmware/build/ODriveFirmware.hex
 # 2.4 应用程序固件的参数部分路径列表
 # 每个参数文件将与主固件拼接，生成一个新固件
 # 参数文件名将被用作新固件的命名
-datafile_paths = ../../txt/光伏驱动轮/Run.hex, ../../txt/光伏滚刷/Brush.hex, ../../txt/光伏驱动轮短款/LiteRun.hex
+datafile_paths = ../../configFiles/光伏驱动轮/Run.hex, ../../configFiles/光伏滚刷/Brush.hex, ../../configFiles/光伏驱动轮短款/LiteRun.hex
+
+# 2.5 NVM参数提取脚本使用的整片Flash HEX路径列表
+nvm_extract_paths = ../../configFiles/光伏驱动轮/RunODrive-fw-v0.5.8.hex, ../../configFiles/光伏滚刷/BrushODrive-fw-v0.5.8.hex, ../../configFiles/光伏驱动轮短款/LiteRunODrive-fw-v0.5.8.hex
 
 # 2.3 调试信息显示控制
 # show_debug = False  # 设置为True可查看详细调试信息
@@ -40,5 +43,6 @@ datafile_paths = ../../txt/光伏驱动轮/Run.hex, ../../txt/光伏滚刷/Brush
 # 2. 地址过滤 - 自动移除 address_threshold 地址之后的所有数据,防止固件过大，无法烧录
 # 3. 新固件名灵活生成 - 输出的文件命名为[参数文件名]-[tag名].hex，
 # 4. 自动删除和覆盖文件 - 直接替换已存在的文件,可选择是否删除主固件同级目录下的其他固件
+# 5. 如果使用bootloader则不支持此方式合并。
 
 # ================================================================================================================

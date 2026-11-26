@@ -541,7 +541,7 @@ def main():
     # print_banner()
     
     # 配置文件路径
-    config_file = "../../txt/版本说明文件/config.txt"
+    config_file = "../../configFiles/版本说明文件/config.txt"
     
     # 首先读取配置以初始化日志器
     initial_config = ConfigParser.parse_config(config_file, Logger())
