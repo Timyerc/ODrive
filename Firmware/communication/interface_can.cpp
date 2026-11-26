@@ -11,6 +11,7 @@
 // Specific CAN Protocols
 #include "can_simple.hpp"
 #include "can_download.hpp"
+#include "bootloader.hpp"
 
 // Safer context handling via maps instead of arrays
 // #include <unordered_map>
@@ -32,35 +33,37 @@ void ODriveCAN::can_server_thread() {
             osSemaphoreWait(sem_can, 10);  // Poll every 10ms regardless of sempahore status
             while (available()) {
                 read(rxmsg);
-                can_Message_t response;
-                if (FirmwareOTA::handle(rxmsg, response)) {
-                    if (FirmwareOTA::reset_after_response()) {
-                        for (uint32_t timeout = 0;
-                             timeout < 100 &&
-                             HAL_CAN_GetTxMailboxesFreeLevel(handle_) == 0;
-                             ++timeout) {
-                            osDelay(1);
-                        }
-                        if (response.len > 0 &&
-                            HAL_CAN_GetTxMailboxesFreeLevel(handle_) > 0) {
+                if (rxmsg.isExt && rxmsg.id == OtaCanProtocol::CAN_ID) {
+                    can_Message_t response;
+                    if (FirmwareOTA::handle(rxmsg, response)) {
+                        if (FirmwareOTA::reset_after_response()) {
+                            for (uint32_t timeout = 0;
+                                 timeout < 100 &&
+                                 HAL_CAN_GetTxMailboxesFreeLevel(handle_) == 0;
+                                 ++timeout) {
+                                osDelay(1);
+                            }
+                            if (response.len > 0 &&
+                                HAL_CAN_GetTxMailboxesFreeLevel(handle_) > 0) {
+                                write(response);
+                            }
+                            for (uint32_t timeout = 0;
+                                 timeout < 100 &&
+                                 HAL_CAN_GetTxMailboxesFreeLevel(handle_) < 3;
+                                 ++timeout) {
+                                osDelay(1);
+                            }
+                            NVIC_SystemReset();
+                        } else if (response.len > 0) {
                             write(response);
                         }
-                        for (uint32_t timeout = 0;
-                             timeout < 100 &&
-                             HAL_CAN_GetTxMailboxesFreeLevel(handle_) < 3;
-                             ++timeout) {
-                            osDelay(1);
-                        }
-                        NVIC_SystemReset();
-                    } else if (response.len > 0) {
-                        write(response);
                     }
-                    continue;
-                }
-                switch (config_.protocol) {
-                    case PROTOCOL_SIMPLE:
-                        CANSimple::handle_can_message(rxmsg);
-                        break;
+                } else {
+                    switch (config_.protocol) {
+                        case PROTOCOL_SIMPLE:
+                            CANSimple::handle_can_message(rxmsg);
+                            break;
+                    }
                 }
             }
             can_Message_t ota_response;
