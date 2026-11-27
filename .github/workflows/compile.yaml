@@ -112,6 +112,7 @@ jobs:
           name: firmwares
           path: |
             Firmware/build/*.hex
+            Firmware/build/bootloader/ODriveBootloader.hex
             Firmware/build/ODriveFirmware.bin
           if-no-files-found: error
 
@@ -155,7 +156,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: firmwares/*
+        files: |
+          firmwares/*
+          firmwares/bootloader/ODriveBootloader.hex
         body: ${{steps.changelog.outputs.changelog}}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
