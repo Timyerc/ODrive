@@ -110,7 +110,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmwares
-          path: Firmware/build/*.hex
+          path: |
+            Firmware/build/*.hex
+            Firmware/build/ODriveFirmware.bin
           if-no-files-found: error
 
   stable-release:
@@ -127,9 +129,17 @@ jobs:
       uses: actions/download-artifact@v6
       with:
         path: firmwares
+        merge-multiple: true
 
     - name: 'Display structure of downloaded files'
       run: ls
+
+    - name: '📦 Prepare release binaries'
+      run: |
+        python3 tools/odrive/extract_nvm_config.py --outdir nvm-configs
+        cp nvm-configs/RunConfig.bin firmwares/RunConfig.bin
+        cp nvm-configs/LiteRunConfig.bin firmwares/LiteRunConfig.bin
+        cp nvm-configs/BrushConfig.bin firmwares/BrushConfig.bin
 
     - name: "✏️ Generate release changelog"
       id: changelog
