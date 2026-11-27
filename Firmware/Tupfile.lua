@@ -123,6 +123,7 @@ FLAGS += '-D__weak="__attribute__((weak))"'
 FLAGS += '-D__packed="__attribute__((__packed__))"'
 FLAGS += '-DUSE_HAL_DRIVER'
 FLAGS += '-DSTM32F405xx'
+FLAGS += '-DVECT_TAB_OFFSET=0x10000'
 
 FLAGS += '-mthumb'
 FLAGS += '-mcpu=cortex-m4'
@@ -205,6 +206,7 @@ build{
         'communication/interface_uart.cpp',
         'communication/interface_usb.cpp',
         'communication/interface_can.cpp',
+        'communication/can_download.cpp',
         'communication/interface_i2c.cpp',
         'fibre/cpp/protocol.cpp',
         'FreeRTOS-openocd.c',
@@ -216,6 +218,51 @@ build{
         'fibre/cpp/include',
         '.',
         "doctest"
+    }
+}
+
+BOOTLOADER_FLAGS = {
+    '-DSTM32F405xx',
+    '-mthumb',
+    '-mcpu=cortex-m4',
+    '-mfpu=fpv4-sp-d16',
+    '-mfloat-abi=hard',
+    '-Wall',
+    '-ffunction-sections',
+    '-fdata-sections',
+    '-fno-exceptions',
+    '-fno-rtti',
+    '-O2'
+}
+BOOTLOADER_LDFLAGS = {
+    '-TBoard/v3/STM32F405RGTx_BOOTLOADER.ld',
+    '-LBoard/v3/Drivers/CMSIS/Lib',
+    '-lc',
+    '-lm',
+    '-lnosys',
+    '-mthumb',
+    '-mcpu=cortex-m4',
+    '-mfpu=fpv4-sp-d16',
+    '-mfloat-abi=hard',
+    '-specs=nosys.specs',
+    '-specs=nano.specs',
+    '-Wl,--gc-sections'
+}
+bootloader_toolchain = GCCToolchain(
+    'arm-none-eabi-', 'build/bootloader', BOOTLOADER_FLAGS, BOOTLOADER_LDFLAGS
+)
+build{
+    name='ODriveBootloader',
+    toolchains={bootloader_toolchain},
+    sources={
+        'bootloader/main.cpp',
+        'Board/v3/startup_stm32f405xx.s'
+    },
+    includes={
+        '.',
+        'Board/v3/Drivers/STM32F4xx_HAL_Driver/Inc',
+        'Board/v3/Drivers/CMSIS/Device/ST/STM32F4xx/Include',
+        'Board/v3/Drivers/CMSIS/Include'
     }
 }
 
